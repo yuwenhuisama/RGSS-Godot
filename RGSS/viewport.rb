@@ -12,7 +12,7 @@ class Viewport
     elsif args.size == 1
       check_arguments(args, [Rect])
       rect, = args
-      @__handler__ = Unity::Viewport.new_xyrw(rect.x, rect.y, rect.w. rect.h)
+      @__handler__ = Unity::Viewport.new_xyrw(rect.x, rect.y, rect.w, rect.h)
     elsif args.size == 4
       check_arguments(args, [Integer, Integer, Integer, Integer])
       @__handler__ = Unity::Viewport.new_xyrw(args[0], args[1], args[2], args[3])

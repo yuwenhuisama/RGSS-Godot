@@ -40,6 +40,7 @@ User wants to migrate RGSS-Unity off Unity onto Godot ("帮我看看怎么搞").
 - **D1 — Source is a THIN TECH-DEMO, but input WORKS**: `Unity::Tilemap` has no C# impl (`tilemap.rb` → NoMethodError on Unity too) → map-render genuinely non-functional. **Correction (Momus catch):** input IS wired — `Assets/GameInputManager.cs` (Assets ROOT, missed by Assets/Scripts-scoped searches) feeds `InputStateRecorder` via the Unity Input System, bound in `SampleScene.unity:1022-1300`. **Resolution**: Wave-1 **Capability Census** defines authoritative parity scope. **USER DECISION: port-the-absence** = faithfully replicate current Unity state → **Tilemap stays absent (out of scope); input is ported as WORKING (in scope)**. "Whatever the current build does" is the target: it has input, it lacks Tilemap.
 - **D2 — Layer-1 reuse ~99% true**: only mandatory Ruby edit is **5 lines in `patch_rmva.rb`** (the `'\.'` backslash path heuristic). Keep the Ruby module **named `"Unity"`** (reimplement C# behind it; do NOT rename). ~40 `rpg/*.rb` + ext + utils = zero changes.
 - **D3 — 6 pre-existing Layer-1 Ruby bugs**: bug-for-bug parity — **do NOT fix** (untouched shared layer = automatic parity); log only; sole exception = a load-blocking syntax error, fixed minimally + logged as deviation.
+  - **⚠ SUPERSEDED 2026-06-06 (USER OVERRIDE)**: user explicitly chose to **fix all 6 Ruby bugs**. Parity is now "more-correct-than-source", not bug-for-bug. The 6 fixes (audio/viewport/bitmap/plane/color/font) + 1 coupled `Color.cs` C# typo are applied, minimal, and verified (build 0 errors, headless boot SCRIPTS/MAIN_LOADED:OK). See capability-census.md "OVERRIDE (2026-06-06)".
 
 ---
 
@@ -69,7 +70,7 @@ Produce a Godot 4.4+ (.NET) build of the RGSS3 runtime that reuses the pure-Ruby
 - Native-node disposal on the **main thread** (release callback), never finalizer thread.
 
 ### Must NOT Have (Guardrails)
-- Do NOT rewrite/refactor Layer-1 Ruby (no "cleanup"); do NOT fix the 6 known Ruby bugs.
+- Do NOT rewrite/refactor Layer-1 Ruby (no "cleanup"); ~~do NOT fix the 6 known Ruby bugs~~ **[SUPERSEDED 2026-06-06: user override — the 6 Ruby bugs ARE now fixed; see D3 note + census OVERRIDE]**.
 - Do NOT rename the Ruby `Unity` module.
 - Do NOT change `Unity::*` API names/signatures (the stable cross-layer contract).
 - Do NOT implement features absent from the current Unity build. **USER DECISION = port-the-absence**: the missing `Unity::Tilemap` binding stays missing (map-render out of scope). **Input, by contrast, IS present and working on Unity → port it as working** (incl. the `GameInputManager` poller). No Tilemap expansion this round.
@@ -154,7 +155,7 @@ WAVE FINAL — 4 parallel reviews, then user okay:
 ├── F1: Plan compliance audit (oracle)
 ├── F2: Code quality review (unspecified-high)
 ├── F3: Automated parity QA — every census-confirmed flow, golden diff (unspecified-high + godot-mcp-pro/playwright)
-└── F4: Scope fidelity check — no Layer-1 edits beyond 5 lines, no bug-fixes, no feature creep (deep)
+└── F4: Scope fidelity check — no Layer-1 edits beyond 5 lines, ~~no bug-fixes~~, no feature creep (deep) **[2026-06-06: the 6 Ruby bug-fixes + 1 coupled Color.cs fix are USER-SANCTIONED via override — F4 must treat them as in-scope, not violations]**
     → Present results → explicit user okay.
 
 Critical Path: T1→T2→T5→T9→T14→T16→T17/T18→T26→F1-F4→user okay

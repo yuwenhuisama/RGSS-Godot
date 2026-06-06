@@ -41,7 +41,7 @@ class Bitmap
 
   def fill_rect(*args)
     if args.size == 2
-      check_arugments(args, [Rect, Color])
+      check_arguments(args, [Rect, Color])
       rect, color = args
 
       @__handler__.fill_rect(rect.x, rect.y, rect.width, rect.height, color.__handler__)
@@ -63,7 +63,7 @@ class Bitmap
       check_arguments([vertical], [[TrueClass, FalseClass, NilClass]])
       vertical ||= false
 
-      @__handler__.gradient_fill_rect(rect.x, rect.y, rect.w. rect.h, color1.__handler__, color2.__handler__, vertical)
+      @__handler__.gradient_fill_rect(rect.x, rect.y, rect.w, rect.h, color1.__handler__, color2.__handler__, vertical)
     elsif args.size == 6 || args.size == 7
       check_arguments(args[0..5], [Integer, Integer, Integer, Integer, Color, Color])
       x, y, width, height, color1, color2, vertical = args

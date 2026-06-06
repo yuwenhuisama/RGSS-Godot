@@ -44,7 +44,7 @@ module Audio
     Unity::Audio.se_play(filename, volume.clamp(0, 100), pitch.clamp(-300, 300), on_loaded)
   end
 
-  [:setup_midi, :bgm_stop, :bgm_pos, :bgs_stop, :bgs_pos, :me_stop, :set_stop].each do |func|
+  [:setup_midi, :bgm_stop, :bgm_pos, :bgs_stop, :bgs_pos, :me_stop, :se_stop].each do |func|
     define_singleton_method(func) do |*args|
       Unity::Audio.send(func, *args)
     end

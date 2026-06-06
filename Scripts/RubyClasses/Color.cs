@@ -123,7 +123,7 @@ namespace RGSSUnity.RubyClasses
         {
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.B = (float)bVal * 255.0f;
+            colorData.B = (float)bVal / 255.0f;
             return state.RbNil;
         }
 
@@ -139,7 +139,7 @@ namespace RGSSUnity.RubyClasses
         {
             var aVal = a.IsInt ? a.ToIntUnchecked() : a.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.A = (float)aVal * 255.0f;
+            colorData.A = (float)aVal / 255.0f;
             return state.RbNil;
         }
     }

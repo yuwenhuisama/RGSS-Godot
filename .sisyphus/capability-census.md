@@ -38,7 +38,7 @@
 | 3 | Window | `Window.cs` (1038) | `[RbClass("Window","Object","Unity")]` L178 | Full: `new_xywh` L186, `windowskin=`, `contents=`, `cursor_rect=`, `move`, `update`, `open?/close?`, `tone`, all opacity/padding/openness accessors; 9-patch skin + cursor + scroll arrows + pause cursor in `Render` L718 | **WORKS** |
 | 4 | Viewport | `Viewport.cs` (383) | `[RbClass("Viewport","Object","Unity")]` L43 | Full: `new_without_rect` L51, `new_xyrw` L69, `flash`, `update`, `rect`, `color`, `tone`, `ox/oy/z`; `Render` L282 | **WORKS** |
 | 5 | Plane | `Plane.cs` (417) | `[RbClass("Plane","Object","Unity")]` L38 | Full: `new_with_viewport` L49, `bitmap=`, `tone`, `color`, `visible`, `z/ox/oy`, `zoom_x/y`, `blend_type`; `Render` L352 | **WORKS** (minor: `disposed?` L330-335 casts to `SpriteData` not `PlaneData` — harmless, see Gaps) |
-| 6 | Color | `Color.cs` (117) | `[RbClass("Color","Object","Unity")]` L15 | Full: `new_rgba`, `set_rgba`, `red/green/blue/alpha` get+set | **WORKS** (parity bugs `blue=` L97 / `alpha=` L113 multiply ×255 instead of ÷255 — known, do-not-fix) |
+| 6 | Color | `Color.cs` (117) | `[RbClass("Color","Object","Unity")]` L15 | Full: `new_rgba`, `set_rgba`, `red/green/blue/alpha` get+set | **WORKS** (formerly: `blue=`/`alpha=` ×255 instead of ÷255 — **FIXED 2026-06-06**, see Override note) |
 | 7 | Tone | `Tone.cs` (147) | `[RbClass("Tone","Object","Unity")]` L41 | Full: `new_rgbg`, `set_rgbg`, `red/green/blue/gray` get+set | **WORKS** |
 | 8 | Rect | `Rect.cs` (118) | `[RbClass("Rect","Object","Unity")]` L16 | Full: `new_xywh`, `set_xywh`, `x/y/width/height` get+set | **WORKS** |
 | 9 | Table | `Table.cs` (198) | `[RbClass("Table","Object","Unity")]` L20 | Full: `new_xyz`, `resize`, `get_x/xy/xyz`, `set_x/xy/xyz` (Int16 backing array) | **WORKS** |
@@ -106,18 +106,20 @@ These are the verified-connected Unity behaviors the Godot port must reproduce t
 - `Graphics.play_movie` — `Graphics.cs:342` `RaiseNotImplementError`.
 - `Audio.setup_midi` — `Audio.cs:19` `RaiseNotImplementError` (MIDI playback unsupported).
 
-**Known bugs present in Unity source (DO NOT FIX — parity baseline). Verified this pass unless noted:**
+**Known bugs — ~~DO NOT FIX (parity baseline)~~ → FIXED per USER OVERRIDE 2026-06-06.**
+
+> **OVERRIDE (2026-06-06)**: The user explicitly elected to **fix all 6 Ruby-layer bugs** (option "Override: fix all 6 Ruby bugs"), superseding the original bug-for-bug parity decision (D3). This is a deliberate parity break: the Godot port now behaves *more correctly* than the source Unity build. All fixes are minimal (1 token / 1 line each). Verified: `dotnet build` 0 errors + headless boot reaches SCRIPTS_LOADED:OK / MAIN_LOADED:OK with no syntax error in any edited file. Original buggy forms retained below (struck through) for historical traceability.
 
 *C# bindings:*
-- `Color.cs:97` `blue=` multiplies ×255 (should ÷255); `Color.cs:113` `alpha=` same. Read-back after `blue=`/`alpha=`/`set_rgba` is wrong. *(Verified.)*
-- `Plane.cs:330-335` `disposed?` calls `GetRDataObject<SpriteData>()` then reads `SpriteObject` instead of `PlaneData`/`PlaneObject`. Harmless in practice (data kept alive by live-keeper). *(Verified.)*
+- ~~`Color.cs:97` `blue=` multiplies ×255 (should ÷255); `Color.cs:113` `alpha=` same.~~ **FIXED** → both now `/ 255.0f` (matching `red=`/`green=`). Coupled to the `color.rb` getter→setter fix below: the Ruby bug previously *masked* these setters (assignment was a silent no-op); fixing Ruby made them reachable, so the C# typo had to be corrected in the same pass or `blue=`/`alpha=` would store corrupted values.
+- `Plane.cs:330-335` `disposed?` calls `GetRDataObject<SpriteData>()` then reads `SpriteObject` instead of `PlaneData`/`PlaneObject`. Harmless in practice (data kept alive by live-keeper). **Left as-is** — not in the 6 Ruby-script bugs the user scoped; C#-only, no behavioral effect.
 
-*Ruby wrappers:*
-- `audio.rb:47` — symbol list contains `:set_stop` (typo for `:se_stop`); `Audio.se_stop` is therefore undefined via this metaprogramming path. *(Verified this pass.)*
-- `viewport.rb:15` — `Unity::Viewport.new_xyrw(rect.x, rect.y, rect.w. rect.h)` — stray `.` (`rect.w. rect.h`) instead of comma; single-Rect ctor path is malformed. *(Verified this pass.)*
-- `bitmap.rb:66` — `gradient_fill_rect(rect.x, rect.y, rect.w. rect.h, ...)` — same `rect.w. rect.h` stray-dot bug on the Rect-arity path; also `check_arugments` typo L44. *(Verified this pass.)*
-- `plane.rb:14` — uses `@viewport.__handler__` (nil ivar) instead of the `viewport` arg in the non-nil branch; `plane.rb:36` `def viewport=` declared with no parameter. *(Verified this pass.)*
-- `color.rb:65`, `font.rb:72/76` — carried from prior-session notepad; **not re-verified in this pass** (those wrapper files were out of this census's read set). Listed for completeness.
+*Ruby wrappers (all FIXED):*
+- ~~`audio.rb:47` — symbol list contains `:set_stop` (typo for `:se_stop`)~~ **FIXED** → `:se_stop` (C# binding `Audio.se_stop` exists, 0-arg, verified).
+- ~~`viewport.rb:15` — `Unity::Viewport.new_xyrw(rect.x, rect.y, rect.w. rect.h)` — stray `.`~~ **FIXED** → `rect.w, rect.h` (now passes 4 args matching `new_xyrw` arity).
+- ~~`bitmap.rb:66` — `gradient_fill_rect(... rect.w. rect.h ...)` stray-dot; also `check_arugments` typo L44~~ **FIXED** → `rect.w, rect.h` (7 args matching binding) + `check_arguments`.
+- ~~`plane.rb:14` — `@viewport.__handler__` (nil ivar) instead of `viewport` arg; `plane.rb:36` `def viewport=` no parameter~~ **FIXED** → `viewport.__handler__` + `def viewport=(value)`.
+- ~~`color.rb:65` `send(prop, v)` (calls getter, ignores value); `font.rb:72/76` `arg is_a?` (missing dot)~~ **FIXED** → `send("#{prop}=", v)` + `arg.is_a?` ×2. font.rb also had a coupled order bug (`name.each` ran before `name = arg`, guaranteed nil-crash, exposed once `is_a?` parsed) — reordered so assignment precedes iteration.
 
 ---
 

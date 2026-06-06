@@ -69,13 +69,13 @@ class Font
       arg, = args
       if arg.is_a? Unity::Font
         @__handler__ = arg
-      elsif arg is_a? String
+      elsif arg.is_a? String
         name = [arg]
         size = Font.default_size
         @__handler__ = Unity::Font.new_ns(name, size)
-      elsif arg is_a? Array
-        name.each { |v| check_type(v, String) }
+      elsif arg.is_a? Array
         name = arg
+        name.each { |v| check_type(v, String) }
         size = Font.default_size
         @__handler__ = Unity::Font.new_ns(name, size)
       end

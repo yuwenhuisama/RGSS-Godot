@@ -11,7 +11,7 @@ class Plane
     if viewport.nil?
       @__handler__ = Unity::Plane.new_with_viewport(Viewport::DEFAULT_VIEWPORT.__handler__)
     else
-      @__handler__ = Unity::Plane.new_with_viewport(@viewport.__handler__)
+      @__handler__ = Unity::Plane.new_with_viewport(viewport.__handler__)
     end
   end
 
@@ -33,7 +33,7 @@ class Plane
     Viewport.new @__handler__.viewport
   end
 
-  def viewport=
+  def viewport=(value)
     check_type(value, Viewport)
     @__handler__.viewport = value.__handler__
   end

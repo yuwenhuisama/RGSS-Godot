@@ -62,7 +62,7 @@ class Color
     define_method("#{prop}=") do |value|
       check_type(value, [Integer, Float])
       v = value.clamp(0, 255)
-      @__handler__.send(prop, v)
+      @__handler__.send("#{prop}=", v)
     end
     define_method(prop) do
       @__handler__.send(prop)
