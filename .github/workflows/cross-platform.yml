@@ -129,7 +129,7 @@ jobs:
           [preset.0.options]
           export/distribution_type=1
           application/name="RGSS-Godot"
-          application/identifier="org.rgss.godot"
+          application/bundle_identifier="org.rgss.godot"
           application/signature="RGSS"
           application/app_category="Games"
           application/short_version="1.0"
