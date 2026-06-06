@@ -114,8 +114,8 @@ function after_build_macos(target)
     os.exec("mkdir -p %s", output_dir)
     os.exec("lipo -create -output %s %s %s", 
             path.join(output_dir, "lib" .. ext_base_name .. "_ext_x64.dylib"), 
-            path.join(os.projectdir(), string.format("build/macosx/arm64/%s/" .. ext_base_name.. "_ext_arm64.dylib", mode)), 
-            path.join(os.projectdir(), string.format("build/macosx/x86_64/%s/".. ext_base_name .. "_ext_x86_64.dylib", mode)))
+            path.join(os.projectdir(), string.format("build/macosx/arm64/%s/lib" .. ext_base_name.. "_ext_arm64.dylib", mode)), 
+            path.join(os.projectdir(), string.format("build/macosx/x86_64/%s/lib".. ext_base_name .. "_ext_x86_64.dylib", mode)))
 end
 
 target(ext_base_name .. "_ext_x64")
