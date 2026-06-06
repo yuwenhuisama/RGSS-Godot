@@ -65,6 +65,9 @@ jobs:
           # in mruby-ext/lib/, NOT each gem's own lib/ subdir.
           mkdir -p RGSS-Godot/mruby-ext/lib
           cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/lib/libmruby_x64.dylib
+          # Make the host dylib's install name rpath-relative so each gem's
+          # @loader_path rpath resolves the colocated libmruby_x64.dylib at load.
+          install_name_tool -id "@rpath/libmruby_x64.dylib" RGSS-Godot/mruby-ext/lib/libmruby_x64.dylib
           cd RGSS-Godot/mruby-ext
           xmake f -m release
           xmake
@@ -182,6 +185,9 @@ jobs:
         working-directory: RGSS-Godot
         run: |
           set -o pipefail
+          # Belt-and-suspenders: let the dynamic loader find the colocated host
+          # libmruby_x64.dylib (gems also carry an @loader_path rpath as the real fix).
+          export DYLD_LIBRARY_PATH="$PWD/Plugins/macos${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
           "$GODOT_BIN" --headless --path . --quit-after 30 2>&1 | tee evidence/headless-macos.log || true
           grep -q "SCRIPTS_LOADED:OK" evidence/headless-macos.log
           grep -q "MAIN_LOADED:OK" evidence/headless-macos.log
@@ -335,6 +341,9 @@ jobs:
         working-directory: RGSS-Godot
         run: |
           set -o pipefail
+          # Belt-and-suspenders: let the dynamic loader find the colocated host
+          # libmruby_x64.so (gems also carry an $ORIGIN rpath as the real fix).
+          export LD_LIBRARY_PATH="$PWD/Plugins/linux${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           "$GODOT_BIN" --headless --path . --quit-after 30 2>&1 | tee evidence/headless-linux.log || true
           grep -q "SCRIPTS_LOADED:OK" evidence/headless-linux.log
           grep -q "MAIN_LOADED:OK" evidence/headless-linux.log

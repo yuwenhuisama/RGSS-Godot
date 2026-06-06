@@ -83,6 +83,29 @@ function common_settings()
 
     add_defines("MRB_INT64", "MRB_NO_PRESYM", "MRB_UTF8_STRING")
     add_defines("HAVE_ONIGMO_H")
+
+    add_host_mruby_link()
+end
+
+-- Link the prebuilt host mruby library. On Linux/macOS the gem .so/.dylib has a
+-- transitive NEEDED dependency on libmruby_x64; link it by NAME (not by path) so
+-- the recorded dependency is the bare soname, and embed an $ORIGIN/@loader_path
+-- rpath so the loader finds the host lib sitting next to the gem in Plugins/<os>/.
+-- Windows keeps the prebuilt .lib import (PATH-based dependency lookup). On
+-- Linux/macOS Onigmo is inlined (add_onigmo_sources), so no onig lib is linked.
+function add_host_mruby_link()
+    if is_plat("windows") then
+        add_links("lib/libmruby_x64.lib")
+        add_links("lib/onigmo_s.lib")
+    elseif is_plat("linux") then
+        add_linkdirs(path.join(os.projectdir(), "lib"))
+        add_links("mruby_x64")
+        add_rpathdirs("$ORIGIN")
+    elseif is_plat("macosx") then
+        add_linkdirs(path.join(os.projectdir(), "lib"))
+        add_links("mruby_x64")
+        add_rpathdirs("@loader_path")
+    end
 end
 
 function after_build_macos(target)
@@ -103,14 +126,11 @@ target(ext_base_name .. "_ext_x64")
         -- win32/config.h). Do NOT inline Onigmo here without ONIG_EXTERN=extern.
         add_files("export.def")
         set_basename("lib" .. ext_base_name .. "_ext_x64")
-        add_links("lib/libmruby_x64.lib")
-        add_links("lib/onigmo_s.lib")
     elseif os_name == "linux" then
         common_settings()
         add_onigmo_sources()
 
         set_basename(ext_base_name .. "_ext_x64")
-        add_links("lib/libmruby_x64.so")
     elseif os_name == "macosx" then
         -- On macOS the public _ext_x64 target is only an alias for the universal
         -- dylib build; without this it defaults to a binary target and fails to
@@ -125,7 +145,6 @@ target(ext_base_name .. "_ext_x64")
 
             set_basename(ext_base_name .. "_ext_x86_64")
             set_arch("x86_64")
-            add_links("lib/libmruby_x64.dylib")
 
         target(ext_base_name .. "_ext_arm64")
             common_settings()
@@ -133,7 +152,6 @@ target(ext_base_name .. "_ext_x64")
 
             set_basename(ext_base_name .. "_ext_arm64")
             set_arch("arm64")
-            add_links("lib/libmruby_x64.dylib")
 
             -- Combine into a universal binary
         target(ext_base_name .. "_ext_universal")
