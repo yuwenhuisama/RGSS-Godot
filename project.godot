@@ -21,3 +21,9 @@ project/assembly_name="RGSS-Godot"
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
+[rendering]
+
+; Required to export for macOS arm64/universal (Apple Silicon); Godot refuses
+; the universal export preset unless ETC2 ASTC VRAM compression is enabled.
+textures/vram_compression/import_etc2_astc=true
