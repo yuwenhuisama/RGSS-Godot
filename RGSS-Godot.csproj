@@ -20,6 +20,19 @@
     <TrimmerRootAssembly Include="RGSS-Godot" />
   </ItemGroup>
 
+  <!--
+    mruby-ext/ is a native (C) xmake build tree for the 4 mruby gems; it is NOT
+    part of the Godot C# assembly. Vendored upstream sources (e.g. zlib's
+    contrib/dotzlib/*.cs) must be excluded or Godot.NET.Sdk's default **/*.cs
+    glob pulls them in, causing duplicate AssemblyInfo attributes + a wildcard
+    version-string build error.
+  -->
+  <ItemGroup>
+    <Compile Remove="mruby-ext/**/*.cs" />
+    <EmbeddedResource Remove="mruby-ext/**/*" />
+    <None Remove="mruby-ext/**/*" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="Plugins\windows\*.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
