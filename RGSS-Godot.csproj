@@ -1,0 +1,38 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RGSSGodot</RootNamespace>
+    <AssemblyName>RGSS-Godot</AssemblyName>
+    <GodotSharpDir Condition="Exists('E:\Godot\GodotSharp')">E:\Godot\GodotSharp</GodotSharpDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MRuby.Library" Version="0.1.7" />
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <TrimmerRootAssembly Include="RGSS-Godot" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Plugins\windows\*.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+    <Content Include="Plugins\macos\*.dylib" Condition="Exists('Plugins\macos')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Plugins\linux\*.so" Condition="Exists('Plugins\linux')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

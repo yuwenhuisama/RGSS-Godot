@@ -1,0 +1,358 @@
+name: Cross-platform RGSS verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.6.1
+  GODOT_STATUS: stable
+  GODOT_VERSION_STATUS: 4.6.1-stable
+  GODOT_EXPORT_TEMPLATE_DIR: 4.6.1.stable.mono
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  verify-macos:
+    name: Verify macOS export and boot
+    runs-on: macos-13
+    steps:
+      - name: Checkout RGSS-Godot
+        uses: actions/checkout@v4
+        with:
+          path: RGSS-Godot
+
+      - name: Checkout RGSS-Unity mruby-ext source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/RGSS-Unity
+          path: RGSS-Unity
+          submodules: recursive
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Clone and build mruby-for-dotnet host library
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
+          cd mruby-for-dotnet
+          git submodule update --init --recursive
+          chmod +x ./build-mruby-mac.sh
+          ./build-mruby-mac.sh
+          cd mruby-shared
+          xmake f -m releasedbg
+          xmake
+
+      - name: Build RGSS native mruby gems
+        shell: bash
+        env:
+          MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
+        run: |
+          set -euxo pipefail
+          mkdir -p RGSS-Unity/mruby-ext/{marshal,glob,regexp,zlib}/lib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/marshal/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/glob/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/regexp/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/zlib/lib/libmruby_x64.dylib
+          cd RGSS-Unity/mruby-ext
+          xmake f -m releasedbg
+          xmake
+          mkdir -p ../../RGSS-Godot/Plugins/macos
+          cp build/macosx/universal/releasedbg/libmruby_*_ext_x64.dylib ../../RGSS-Godot/Plugins/macos/
+          cp ../../mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib ../../RGSS-Godot/Plugins/macos/
+
+      - name: Install Godot 4.6.1 stable mono
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_macos.universal.zip
+          unzip -q godot.zip -d godot
+          GODOT_BIN=$(find godot -name Godot -type f | head -n 1)
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          curl -L -o export_templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_export_templates.tpz
+          mkdir -p "$HOME/Library/Application Support/Godot/export_templates/${GODOT_EXPORT_TEMPLATE_DIR}"
+          unzip -q export_templates.tpz -d export_templates
+          cp -R export_templates/templates/* "$HOME/Library/Application Support/Godot/export_templates/${GODOT_EXPORT_TEMPLATE_DIR}/"
+
+      - name: Prepare CI project config and export preset
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -euxo pipefail
+          mkdir -p RMProject export evidence
+          python3 - <<'PY'
+          import json
+          conf = {
+              "rtp_path": "",
+              "legacy_mode": True,
+              "legacy_mode_width": 544,
+              "legacy_mode_height": 416,
+              "project_path": "./RMProject",
+              "cn_ver_rmva": True,
+          }
+          with open("rm_conf.json", "w", encoding="utf-8") as f:
+              json.dump(conf, f, indent=2)
+          PY
+          cat > export_presets.cfg <<'EOF'
+          [preset.0]
+          name="macOS"
+          platform="macOS"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="export/RGSS-Godot-macos.zip"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          encrypt_pck=false
+          encrypt_directory=false
+
+          [preset.0.options]
+          export/distribution_type=1
+          application/name="RGSS-Godot"
+          application/identifier="org.rgss.godot"
+          application/signature="RGSS"
+          application/app_category="Games"
+          application/short_version="1.0"
+          application/version="1.0"
+          binary_format/architecture="universal"
+          codesign/codesign=0
+          codesign/installer_identity=""
+          codesign/apple_team_id=""
+          codesign/identity=""
+          codesign/entitlements/custom_file=""
+          codesign/entitlements/allow_jit_code_execution=true
+          codesign/entitlements/allow_unsigned_executable_memory=true
+          codesign/entitlements/allow_dyld_environment_variables=false
+          codesign/entitlements/disable_library_validation=true
+          codesign/entitlements/audio_input=false
+          codesign/entitlements/camera=false
+          codesign/entitlements/location=false
+          codesign/entitlements/address_book=false
+          codesign/entitlements/calendars=false
+          codesign/entitlements/photos_library=false
+          codesign/entitlements/apple_events=false
+          codesign/entitlements/debugging=false
+          notarization/notarization=0
+          privacy/microphone_usage_description=""
+          privacy/camera_usage_description=""
+          privacy/location_usage_description=""
+          privacy/address_book_usage_description=""
+          privacy/calendar_usage_description=""
+          privacy/photos_library_usage_description=""
+          privacy/desktop_folder_usage_description=""
+          privacy/documents_folder_usage_description=""
+          privacy/downloads_folder_usage_description=""
+          privacy/network_volumes_usage_description=""
+          privacy/removable_volumes_usage_description=""
+          EOF
+
+      - name: Build Godot .NET project
+        shell: bash
+        working-directory: RGSS-Godot
+        run: dotnet build RGSS-Godot.csproj
+
+      - name: Export Godot project
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -euxo pipefail
+          "$GODOT_BIN" --headless --path . --build-solutions --quit-after 30
+          "$GODOT_BIN" --headless --path . --export-debug macOS export/RGSS-Godot-macos.zip
+          test -f export/RGSS-Godot-macos.zip
+
+      - name: Run headless boot verification
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -o pipefail
+          "$GODOT_BIN" --headless --path . --quit-after 30 2>&1 | tee evidence/headless-macos.log || true
+          grep -q "SCRIPTS_LOADED:OK" evidence/headless-macos.log
+          grep -q "MAIN_LOADED:OK" evidence/headless-macos.log
+          grep -q "Running RGSS3 main loop" evidence/headless-macos.log
+          ! grep -q "GEM_INIT_FAIL" evidence/headless-macos.log
+          {
+            echo "TASK:T27 macOS cross-platform verification"
+            echo "RUNNER:macos-13"
+            echo "EXPORT:export/RGSS-Godot-macos.zip"
+            echo "ASSERT:SCRIPTS_LOADED:OK"
+            echo "ASSERT:MAIN_LOADED:OK"
+            echo "ASSERT:Running RGSS3 main loop"
+            echo "ASSERT:NO_GEM_INIT_FAIL"
+          } > evidence/t27-macos-ci.txt
+
+      - name: Upload macOS evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: t27-macos-evidence
+          path: RGSS-Godot/evidence/
+
+  verify-linux:
+    name: Verify Linux export and boot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout RGSS-Godot
+        uses: actions/checkout@v4
+        with:
+          path: RGSS-Godot
+
+      - name: Checkout RGSS-Unity mruby-ext source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/RGSS-Unity
+          path: RGSS-Unity
+          submodules: recursive
+
+      - name: Install Linux build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ruby bison libreadline-dev libssl-dev zlib1g-dev unzip
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Clone and build mruby-for-dotnet host library
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
+          cd mruby-for-dotnet
+          git submodule update --init --recursive
+          chmod +x ./build-mruby-linux.sh
+          ./build-mruby-linux.sh
+          cd mruby-shared
+          xmake f -m releasedbg
+          xmake
+
+      - name: Build RGSS native mruby gems
+        shell: bash
+        env:
+          MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
+        run: |
+          set -euxo pipefail
+          mkdir -p RGSS-Unity/mruby-ext/{marshal,glob,regexp,zlib}/lib
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/marshal/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/glob/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/regexp/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/zlib/lib/libmruby_x64.so
+          cd RGSS-Unity/mruby-ext
+          xmake f -m releasedbg
+          xmake
+          mkdir -p ../../RGSS-Godot/Plugins/linux
+          cp build/linux/x86_64/releasedbg/libmruby_*_ext_x64.so ../../RGSS-Godot/Plugins/linux/
+          cp ../../mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so ../../RGSS-Godot/Plugins/linux/
+
+      - name: Install Godot 4.6.1 stable mono
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_linux_x86_64.zip
+          unzip -q godot.zip -d godot
+          GODOT_BIN=$(find godot -name Godot_v${GODOT_VERSION_STATUS}_mono_linux.x86_64 -type f | head -n 1)
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          curl -L -o export_templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_EXPORT_TEMPLATE_DIR}"
+          unzip -q export_templates.tpz -d export_templates
+          cp -R export_templates/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_EXPORT_TEMPLATE_DIR}/"
+
+      - name: Prepare CI project config and export preset
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -euxo pipefail
+          mkdir -p RMProject export evidence
+          python3 - <<'PY'
+          import json
+          conf = {
+              "rtp_path": "",
+              "legacy_mode": True,
+              "legacy_mode_width": 544,
+              "legacy_mode_height": 416,
+              "project_path": "./RMProject",
+              "cn_ver_rmva": True,
+          }
+          with open("rm_conf.json", "w", encoding="utf-8") as f:
+              json.dump(conf, f, indent=2)
+          PY
+          cat > export_presets.cfg <<'EOF'
+          [preset.0]
+          name="Linux/X11"
+          platform="Linux/X11"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="export/RGSS-Godot-linux.x86_64"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          encrypt_pck=false
+          encrypt_directory=false
+
+          [preset.0.options]
+          binary_format/architecture="x86_64"
+          custom_template/debug=""
+          custom_template/release=""
+          debug/export_console_wrapper=1
+          ssh_remote_deploy/enabled=false
+          EOF
+
+      - name: Build Godot .NET project
+        shell: bash
+        working-directory: RGSS-Godot
+        run: dotnet build RGSS-Godot.csproj
+
+      - name: Export Godot project
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -euxo pipefail
+          "$GODOT_BIN" --headless --path . --build-solutions --quit-after 30
+          "$GODOT_BIN" --headless --path . --export-debug "Linux/X11" export/RGSS-Godot-linux.x86_64
+          test -f export/RGSS-Godot-linux.x86_64
+
+      - name: Run headless boot verification
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -o pipefail
+          "$GODOT_BIN" --headless --path . --quit-after 30 2>&1 | tee evidence/headless-linux.log || true
+          grep -q "SCRIPTS_LOADED:OK" evidence/headless-linux.log
+          grep -q "MAIN_LOADED:OK" evidence/headless-linux.log
+          grep -q "Running RGSS3 main loop" evidence/headless-linux.log
+          ! grep -q "GEM_INIT_FAIL" evidence/headless-linux.log
+          {
+            echo "TASK:T28 Linux cross-platform verification"
+            echo "RUNNER:ubuntu-latest"
+            echo "EXPORT:export/RGSS-Godot-linux.x86_64"
+            echo "ASSERT:SCRIPTS_LOADED:OK"
+            echo "ASSERT:MAIN_LOADED:OK"
+            echo "ASSERT:Running RGSS3 main loop"
+            echo "ASSERT:NO_GEM_INIT_FAIL"
+          } > evidence/t28-linux-ci.txt
+
+      - name: Upload Linux evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: t28-linux-evidence
+          path: RGSS-Godot/evidence/

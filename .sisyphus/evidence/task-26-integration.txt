@@ -1,0 +1,404 @@
+# T26 Full Windows integration evidence
+
+Date: 2026-06-06
+
+## Fix applied
+Updated `E:\Projects\RGSS-Godot\Scripts\UnityModule.cs` in `RegisterRmvaScript`:
+- Zero-length script payloads are registered as empty scripts and return immediately.
+- Zlib inflation is wrapped in try/catch.
+- Inflate failures are logged with `RGSSLogger.LogError(...)` and the script is registered with an empty body instead of crashing.
+- `using System;` was already present.
+
+## Config/path status
+`E:\Projects\RGSS-Godot\rm_conf.json` points to the real Unity StreamingAssets base:
+
+```json
+{
+  "rtp_path": "F:/Softwares/RPG Maker VX Ace/RTP",
+  "legacy_mode": true,
+  "legacy_mode_width": 544,
+  "legacy_mode_height": 416,
+  "project_path": "E:/Projects/RGSS-Unity/Assets/StreamingAssets",
+  "cn_ver_rmva": true
+}
+```
+
+`Scripts.rvdata2` resolves through `RMProjectPath` to:
+`E:\Projects\RGSS-Unity\Assets\StreamingAssets\RMProject\Data\Scripts.rvdata2`
+
+## Diagnostics/build
+LSP diagnostics could not run because `csharp-ls` is not installed in this environment.
+
+Command:
+`dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj" 2>&1`
+
+Result:
+- Build succeeded.
+- 0 errors.
+- 6 pre-existing warnings remain; the EOF fix introduced no new warnings after null-coalescing the script name.
+
+Build output:
+```text
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+E:\Projects\RGSS-Godot\Scripts\RubyExtension.cs(11,83): warning CS8622: Nullability of reference types in type of parameter 'obj' of 'void RbClassExtension.Release(RbState state, object obj)' doesn't match the target delegate 'Action<RbState, object?>' (possibly because of nullability attributes). [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+E:\Projects\RGSS-Godot\Scripts\Kernel.cs(48,31): warning CS8604: Possible null reference argument for parameter 'pathStr' in 'RbValue Kernel.Require(RbState state, string pathStr)'. [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+E:\Projects\RGSS-Godot\Scripts\RubyClasses\Font.cs(46,25): warning CS8619: Nullability of reference types in value of type 'string?[]' doesn't match target type 'string[]'. [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+E:\Projects\RGSS-Godot\Scripts\RubyClasses\Font.cs(68,30): warning CS8619: Nullability of reference types in value of type 'string?[]' doesn't match target type 'string[]'. [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+E:\Projects\RGSS-Godot\Scripts\UnityModule.cs(94,28): warning CS8604: Possible null reference argument for parameter 'msg' in 'void RGSSLogger.Log(string msg)'. [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+E:\Projects\RGSS-Godot\Scripts\RubyClasses\Bitmap.cs(19,21): warning CS0618: 'Image.Create(int, int, bool, Image.Format)' is obsolete: 'Use 'Godot.Image.CreateEmpty(int, int, bool, Image.Format)'.' [E:\Projects\RGSS-Godot\RGSS-Godot.csproj]
+  RGSS-Godot -> E:\Projects\RGSS-Godot\.godot\mono\temp\bin\Debug\RGSS-Godot.dll
+
+Build succeeded.
+    6 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.85
+```
+
+## Headless command
+Command:
+`& "E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe" --headless --path "E:\Projects\RGSS-Godot" --quit-after 60 2>&1`
+
+Output:
+```text
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+
+RMPROJECT_PATH:E:\Projects\RGSS-Unity\Assets\StreamingAssets
+CONFIG:True,544x416
+SCRIPTS_LOADED:OK
+Initialize RGSS3 scripts...
+RMVA project path: E:\Projects\RGSS-Unity\Assets\StreamingAssets
+RTP path: F:/Softwares/RPG Maker VX Ace/RTP
+Loaded script: kernel
+Loaded script: tone
+Loaded script: type_check_util
+Loaded script: rect
+Loaded script: color
+Loaded script: font
+Loaded script: graphics
+Loaded script: input
+Loaded script: audio
+Loaded script: sprite
+Loaded script: bitmap
+Loaded script: viewport
+Loaded script: plane
+Loaded script: window
+Loaded script: table
+Loaded script: rgss_error
+Loaded script: rgss_reset
+Loaded script: ext/dir_glob
+Loaded script: ext/dir
+Loaded script: ext/onig_regexp
+Loaded script: rpg/actor
+Loaded script: rpg/base_item
+Loaded script: rpg/animation.frame
+Loaded script: rpg/animation
+Loaded script: rpg/animation.timing
+Loaded script: rpg/armor
+Loaded script: rpg/equip_item
+Loaded script: rpg/audio_file
+Loaded script: rpg/base_item.feature
+Loaded script: rpg/bgm
+Loaded script: rpg/bgs
+Loaded script: rpg/class.learning
+Loaded script: rpg/class
+Loaded script: rpg/common_event
+Loaded script: rpg/enemy.action
+Loaded script: rpg/enemy
+Loaded script: rpg/enemy.drop_item
+Loaded script: rpg/event_command
+Loaded script: rpg/event.page.condition
+Loaded script: rpg/event.page
+Loaded script: rpg/event
+Loaded script: rpg/event.page.graphics
+Loaded script: rpg/item
+Loaded script: rpg/usable_item
+Loaded script: rpg/map_info
+Loaded script: rpg/map.encounter
+Loaded script: rpg/map
+Loaded script: rpg/me
+Loaded script: rpg/move_command
+Loaded script: rpg/move_route
+Loaded script: rpg/se
+Loaded script: rpg/skill
+Loaded script: rpg/state
+Loaded script: rpg/system
+Loaded script: rpg/system.terms
+Loaded script: rpg/system.vehicle
+Loaded script: rpg/test_battle
+Loaded script: rpg/tileset
+Loaded script: rpg/troop.member
+Loaded script: rpg/troop
+Loaded script: rpg/troop.page.condition
+Loaded script: rpg/troop.page
+Loaded script: rpg/usable_item.damage
+Loaded script: rpg/usable_item.effect
+Loaded script: rpg/weapon
+Loaded RMVA script: Vocab
+Loaded RMVA script: Sound
+Loaded RMVA script: Cache
+Loaded RMVA script: DataManager
+Loaded RMVA script: SceneManager
+Loaded RMVA script: BattleManager
+Loaded RMVA script: Game_Temp
+Loaded RMVA script: Game_System
+Loaded RMVA script: Game_Timer
+Loaded RMVA script: Game_Message
+Loaded RMVA script: Game_Switches
+Loaded RMVA script: Game_Variables
+Loaded RMVA script: Game_SelfSwitches
+Loaded RMVA script: Game_Screen
+Loaded RMVA script: Game_Picture
+Loaded RMVA script: Game_Pictures
+Loaded RMVA script: Game_BaseItem
+Loaded RMVA script: Game_Action
+Loaded RMVA script: Game_ActionResult
+Loaded RMVA script: Game_BattlerBase
+Loaded RMVA script: Game_Battler
+Loaded RMVA script: Game_Actor
+Loaded RMVA script: Game_Enemy
+Loaded RMVA script: Game_Actors
+Loaded RMVA script: Game_Unit
+Loaded RMVA script: Game_Party
+Loaded RMVA script: Game_Troop
+Loaded RMVA script: Game_Map
+Loaded RMVA script: Game_CommonEvent
+Loaded RMVA script: Game_CharacterBase
+Loaded RMVA script: Game_Character
+Loaded RMVA script: Game_Player
+Loaded RMVA script: Game_Follower
+Loaded RMVA script: Game_Followers
+Loaded RMVA script: Game_Vehicle
+Loaded RMVA script: Game_Event
+Loaded RMVA script: Game_Interpreter
+Loaded RMVA script: Sprite_Base
+Loaded RMVA script: Sprite_Character
+Loaded RMVA script: Sprite_Battler
+Loaded RMVA script: Sprite_Picture
+Loaded RMVA script: Sprite_Timer
+Loaded RMVA script: Spriteset_Weather
+Loaded RMVA script: Spriteset_Map
+Loaded RMVA script: Spriteset_Battle
+Loaded RMVA script: Window_Base
+Loaded RMVA script: Window_Selectable
+Loaded RMVA script: Window_Command
+Loaded RMVA script: Window_HorzCommand
+Loaded RMVA script: Window_Help
+Loaded RMVA script: Window_Gold
+Loaded RMVA script: Window_MenuCommand
+Loaded RMVA script: Window_MenuStatus
+Loaded RMVA script: Window_MenuActor
+Loaded RMVA script: Window_ItemCategory
+Loaded RMVA script: Window_ItemList
+Loaded RMVA script: Window_SkillCommand
+Loaded RMVA script: Window_SkillStatus
+Loaded RMVA script: Window_SkillList
+Loaded RMVA script: Window_EquipStatus
+Loaded RMVA script: Window_EquipCommand
+Loaded RMVA script: Window_EquipSlot
+Loaded RMVA script: Window_EquipItem
+Loaded RMVA script: Window_Status
+Loaded RMVA script: Window_SaveFile
+Loaded RMVA script: Window_ShopCommand
+Loaded RMVA script: Window_ShopBuy
+Loaded RMVA script: Window_ShopSell
+Loaded RMVA script: Window_ShopNumber
+Loaded RMVA script: Window_ShopStatus
+Loaded RMVA script: Window_NameEdit
+Loaded RMVA script: Window_NameInput
+Loaded RMVA script: Window_ChoiceList
+Loaded RMVA script: Window_NumberInput
+Loaded RMVA script: Window_KeyItem
+Loaded RMVA script: Window_Message
+Loaded RMVA script: Window_ScrollText
+Loaded RMVA script: Window_MapName
+Loaded RMVA script: Window_BattleLog
+Loaded RMVA script: Window_PartyCommand
+Loaded RMVA script: Window_ActorCommand
+Loaded RMVA script: Window_BattleStatus
+Loaded RMVA script: Window_BattleActor
+Loaded RMVA script: Window_BattleEnemy
+Loaded RMVA script: Window_BattleSkill
+Loaded RMVA script: Window_BattleItem
+Loaded RMVA script: Window_TitleCommand
+Loaded RMVA script: Window_GameEnd
+Loaded RMVA script: Window_DebugLeft
+Loaded RMVA script: Window_DebugRight
+Loaded RMVA script: Scene_Base
+Loaded RMVA script: Scene_Title
+Loaded RMVA script: Scene_Map
+Loaded RMVA script: Scene_MenuBase
+Loaded RMVA script: Scene_Menu
+Loaded RMVA script: Scene_ItemBase
+Loaded RMVA script: Scene_Item
+Loaded RMVA script: Scene_Skill
+Loaded RMVA script: Scene_Equip
+Loaded RMVA script: Scene_Status
+Loaded RMVA script: Scene_File
+Loaded RMVA script: Scene_Save
+Loaded RMVA script: Scene_Load
+Loaded RMVA script: Scene_End
+Loaded RMVA script: Scene_Shop
+Loaded RMVA script: Scene_Name
+Loaded RMVA script: Scene_Debug
+Loaded RMVA script: Scene_Battle
+Loaded RMVA script: Scene_Gameover
+Loaded RMVA script: (璇峰湪姝ゆ坊鍔?
+Loaded RMVA script: Main
+Loaded script: patch_rmva
+MAIN_LOADED:OK
+run rmva script: 
+run rmva script: 鈻?妯″潡
+run rmva script: Vocab
+run rmva script: Sound
+run rmva script: Cache
+run rmva script: DataManager
+run rmva script: SceneManager
+run rmva script: BattleManager
+run rmva script: 
+run rmva script: 鈻?瀵硅薄
+run rmva script: Game_Temp
+run rmva script: Game_System
+run rmva script: Game_Timer
+run rmva script: Game_Message
+run rmva script: Game_Switches
+run rmva script: Game_Variables
+run rmva script: Game_SelfSwitches
+run rmva script: Game_Screen
+run rmva script: Game_Picture
+run rmva script: Game_Pictures
+run rmva script: Game_BaseItem
+run rmva script: Game_Action
+run rmva script: Game_ActionResult
+run rmva script: Game_BattlerBase
+run rmva script: Game_Battler
+run rmva script: Game_Actor
+run rmva script: Game_Enemy
+run rmva script: Game_Actors
+run rmva script: Game_Unit
+run rmva script: Game_Party
+run rmva script: Game_Troop
+run rmva script: Game_Map
+run rmva script: Game_CommonEvent
+run rmva script: Game_CharacterBase
+run rmva script: Game_Character
+run rmva script: Game_Player
+run rmva script: Game_Follower
+run rmva script: Game_Followers
+run rmva script: Game_Vehicle
+run rmva script: Game_Event
+run rmva script: Game_Interpreter
+run rmva script: 
+run rmva script: 鈻?绮剧伒
+run rmva script: Sprite_Base
+run rmva script: Sprite_Character
+run rmva script: Sprite_Battler
+run rmva script: Sprite_Picture
+run rmva script: Sprite_Timer
+run rmva script: Spriteset_Weather
+run rmva script: Spriteset_Map
+run rmva script: Spriteset_Battle
+run rmva script: 
+run rmva script: 鈻?绐楀彛
+run rmva script: Window_Base
+run rmva script: Window_Selectable
+run rmva script: Window_Command
+run rmva script: Window_HorzCommand
+run rmva script: Window_Help
+run rmva script: Window_Gold
+run rmva script: Window_MenuCommand
+run rmva script: Window_MenuStatus
+run rmva script: Window_MenuActor
+run rmva script: Window_ItemCategory
+run rmva script: Window_ItemList
+run rmva script: Window_SkillCommand
+run rmva script: Window_SkillStatus
+run rmva script: Window_SkillList
+run rmva script: Window_EquipStatus
+run rmva script: Window_EquipCommand
+run rmva script: Window_EquipSlot
+run rmva script: Window_EquipItem
+run rmva script: Window_Status
+run rmva script: Window_SaveFile
+run rmva script: Window_ShopCommand
+run rmva script: Window_ShopBuy
+run rmva script: Window_ShopSell
+run rmva script: Window_ShopNumber
+run rmva script: Window_ShopStatus
+run rmva script: Window_NameEdit
+run rmva script: Window_NameInput
+run rmva script: Window_ChoiceList
+run rmva script: Window_NumberInput
+run rmva script: Window_KeyItem
+run rmva script: Window_Message
+run rmva script: Window_ScrollText
+run rmva script: Window_MapName
+run rmva script: Window_BattleLog
+run rmva script: Window_PartyCommand
+run rmva script: Window_ActorCommand
+run rmva script: Window_BattleStatus
+run rmva script: Window_BattleActor
+run rmva script: Window_BattleEnemy
+run rmva script: Window_BattleSkill
+run rmva script: Window_BattleItem
+run rmva script: Window_TitleCommand
+run rmva script: Window_GameEnd
+run rmva script: Window_DebugLeft
+run rmva script: Window_DebugRight
+run rmva script: 
+run rmva script: 鈻?鍦烘櫙
+run rmva script: Scene_Base
+run rmva script: Scene_Title
+run rmva script: Scene_Map
+run rmva script: Scene_MenuBase
+run rmva script: Scene_Menu
+run rmva script: Scene_ItemBase
+run rmva script: Scene_Item
+run rmva script: Scene_Skill
+run rmva script: Scene_Equip
+run rmva script: Scene_Status
+run rmva script: Scene_File
+run rmva script: Scene_Save
+run rmva script: Scene_Load
+run rmva script: Scene_End
+run rmva script: Scene_Shop
+run rmva script: Scene_Name
+run rmva script: Scene_Debug
+run rmva script: Scene_Battle
+run rmva script: Scene_Gameover
+run rmva script: 
+run rmva script: 鈻?鎻掍欢鑴氭湰
+run rmva script: (璇峰湪姝ゆ坊鍔?
+run rmva script: 
+run rmva script: 鈻?鍏ュ彛
+run rmva script: Main
+run rmva script: 
+RGSS3 scripts loaded successfully.
+Running RGSS3 main loop...
+Unhandled Ruby exception happened in script:
+ Exception: Native Exception Message: External component has thrown an exception.
+ Stacktrace:    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+Backtrace:
+	bitmap.rb:16:in new_filename
+	bitmap.rb:16:in initialize
+	Cache.rmvascript:106:in normal_bitmap
+	Cache.rmvascript:91:in load_bitmap
+	patch_rmva.rb:169:in load_bitmap
+	Cache.rmvascript:75:in title1
+	Scene_Title.rmvascript:41:in create_background
+	Scene_Title.rmvascript:16:in start
+	patch_rmva.rb:24:in main
+	patch_rmva.rb:10
+
+	Script name: bitmap.rb
+	Line number: 16
+```
+
+## Result
+- PASS: No `No such file or directory - open .../Scripts.rvdata2` error.
+- PASS: No `SharpZipLib Unexpected EOF` crash after the fix.
+- PASS: RMVA script names load from the actual game data, including `Vocab`, `Sound`, `Cache`, `DataManager`, `Scene_Title`, and `Main`.
+- PASS: Boot reaches `RGSS3 scripts loaded successfully.` and `Running RGSS3 main loop...`.
+- NEXT BLOCKER: Runtime now fails later while loading the title background bitmap: `bitmap.rb:16 -> Cache.title1 -> Scene_Title.create_background`, with native message `External component has thrown an exception.` This is after game-script loading and after entering the main loop, so it is outside the EOF fix.

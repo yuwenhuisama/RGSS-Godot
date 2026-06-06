@@ -1,0 +1,72 @@
+================================================================================
+TASK 20 (T20) — Plane Binding for RGSS-Unity -> Godot 4 Migration
+================================================================================
+Date: 2026-06-06
+Project: E:\Projects\RGSS-Godot
+
+--------------------------------------------------------------------------------
+FILES CHANGED
+--------------------------------------------------------------------------------
+1. Scripts\RubyClasses\PlaneData.cs  (REPLACED 10-line stub -> full data class)
+   - Fields: Bitmap, Viewport, Ox, Oy, ZoomX=1, ZoomY=1, Z=100, Visible=true,
+     Opacity=255, BlendType, Tone, Color, Disposed, Node (Node2D?).
+
+2. Scripts\RubyClasses\Plane.cs  (NEW FILE)
+   - [RbClass("Plane", "Object", "Unity")]
+   - new_with_viewport -> RegisterPlane(data, viewportData); sets @viewport, @bitmap=nil
+   - dispose / disposed?
+   - bitmap / bitmap=  (BitmapData via @bitmap ivar)
+   - viewport / viewport=  (re-registers to new viewport)
+   - tone / tone=  (ToneData, 0-255 boundary via Tone.CreateTone)
+   - color / color=  (ColorData, 0-255 boundary via Color.CreateColor)
+   - visible / visible=, opacity / opacity=, blend_type / blend_type=
+   - ox / ox=, oy / oy=, z / z=, zoom_x / zoom_x=, zoom_y / zoom_y=
+   - Pattern mirrors Sprite.cs exactly (self["@bitmap"], GetRDataObject<PlaneData>()).
+
+3. Scripts\GameRenderManager.cs  (EXTENDED)
+   - Added fields: planes (Dictionary<PlaneData,PlaneDataNode>), pendingPlanes (List).
+   - Update(): added pendingPlanes flush block, parallel to pendingSprites.
+   - Added RegisterPlane(PlaneData, ViewportData) + UnregisterPlane(PlaneData),
+     pattern-identical to RegisterSprite/UnregisterSprite (pending-queue fallback,
+     reparent-on-existing, AddChild to entry.SubViewportRoot).
+   - Dispose(): added planes.Clear() and pendingPlanes.Clear().
+   - PlaneDataNode: changed base class Node -> Node2D so it is assignable to
+     PlaneData.Node (Node2D?), matching SpriteDataNode : Sprite2D. RenderPlane()
+     is still the existing no-op stub (left as-is per spec).
+
+--------------------------------------------------------------------------------
+BUILD VERIFICATION
+--------------------------------------------------------------------------------
+Command: dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj"
+
+Result:
+  Build succeeded.
+      0 Error(s)
+
+  (Full first build reported 7 pre-existing warnings, ALL in unrelated files:
+   Bitmap.cs CS0618, RubyExtension.cs CS8622, Kernel.cs CS8604, Font.cs CS8619 x2,
+   UnityModule.cs CS8604/CS8620. NONE in PlaneData.cs / Plane.cs / GameRenderManager.cs.
+   Incremental rebuild: 0 Warning(s) / 0 Error(s).)
+
+--------------------------------------------------------------------------------
+HEADLESS RUN VERIFICATION
+--------------------------------------------------------------------------------
+Command: E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless
+         --path "E:\Projects\RGSS-Godot" --quit-after 10
+
+Markers found:
+  SCRIPTS_LOADED:OK
+  Loaded script: plane
+  MAIN_LOADED:OK
+
+Plane-related errors: NONE (grep for Plane + error/exception/fail = empty).
+
+Note: A later runtime Ruby exception occurs AFTER both success markers:
+  "No such file or directory - open .../RMProject/Data/Scripts.rvdata2"
+This is missing sample GAME DATA (RMProject/ is game content, not engine code per
+AGENTS.md), pre-existing and unrelated to the Plane binding. Both required markers
+(SCRIPTS_LOADED:OK + MAIN_LOADED:OK) fire before it.
+
+RESULT: T20 COMPLETE — builds with 0 errors, plane.rb + Unity::Plane register and
+load cleanly under the headless runtime.
+================================================================================

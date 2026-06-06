@@ -1,0 +1,23 @@
+T1 — IL Trim Scenario
+Date: 2026-06-05 18:51:57
+Result: PASS
+
+=== Trim Configuration ===
+csproj: <PublishTrimmed>true</PublishTrimmed> + <TrimMode>partial</TrimMode>
+         <TrimmerRootAssembly Include="RGSS-GodotSpike" />
+Code:   [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(MrubySpike))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RbTypeRegisterHelper))]
+
+=== Trim Exported Binary Run ===
+Command: RGSS-GodotSpike.exe --headless (Release export with PublishTrimmed=true)
+Output: PING_OK:pong
+Status: PASS — [RbModuleMethod] decorated type survived trimming
+
+=== Analysis ===
+- TrimMode=partial trims non-root assemblies only; root assembly kept intact
+- [DynamicDependency] on the entry method prevents RbTypeRegisterHelper from being trimmed
+- MRuby.Library.dll is NOT trimmed (not in trim root, but it's referenced so kept)
+- All 4 gem DllImports survive (P/Invoke is not affected by IL trimming)
+- NativeLibrary.SetDllImportResolver wired before any P/Invoke call — works with trim
+
+VERDICT: PASS — Trimming does not break P/Invoke or [RbClass]/[RbModule] registration

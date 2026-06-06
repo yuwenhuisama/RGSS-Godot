@@ -1,0 +1,35 @@
+================================================================================
+TASK 25 (T25) — patch_rmva.rb Cross-Platform Path Extension Fix
+================================================================================
+Date: 2026-06-06
+File: E:\Projects\RGSS-Godot\RGSS\patch_rmva.rb
+
+--------------------------------------------------------------------------------
+CHANGE (the ONLY sanctioned Ruby edit)
+--------------------------------------------------------------------------------
+Replaced  unless filename.include?('\.')
+with      unless filename.include?('.')
+
+On exactly 5 lines: 108, 121, 134, 147, 164
+Contexts: Audio.bgm_play, Audio.bgs_play, Audio.me_play, Audio.se_play, Cache.load_bitmap
+
+Rationale: '\.' is a literal backslash-dot string in Ruby (NOT a regex inside
+String#include?), so it never matched a normal "name.ext" filename on any platform
+and could false-match Windows paths. '.' correctly tests for a file extension dot.
+Total diff: 5 lines changed, nothing else.
+
+--------------------------------------------------------------------------------
+VERIFICATION
+--------------------------------------------------------------------------------
+Backslash-dot occurrences  (Select-String "include\?\('\\\.'\)"):  0
+Clean-dot   occurrences    (Select-String "include\?\('\.'\)"):    5
+
+Required outcome: exactly 5 occurrences of '.' (extension test), zero of '\.'.
+RESULT: PASS — 0 x '\.' , 5 x '.'.
+
+Build + headless run after this edit: see task-20-plane.txt
+  Build succeeded, 0 Error(s).
+  SCRIPTS_LOADED:OK and MAIN_LOADED:OK both present.
+
+RESULT: T25 COMPLETE.
+================================================================================

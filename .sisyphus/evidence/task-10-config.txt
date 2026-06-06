@@ -1,0 +1,11 @@
+Task: T10 - GlobalConfig
+Date: 2026-06-05
+
+Implemented `E:\Projects\RGSS-Godot\Scripts\GlobalConfig.cs` as a `System.Text.Json` singleton with BOM stripping and runtime path fallback (`OS.GetExecutablePath()` -> `res://` -> CWD).
+
+BootManager now initializes config before Ruby startup and prints the verification marker.
+
+Verification:
+- `dotnet build E:\Projects\RGSS-Godot\RGSS-Godot.csproj` -> 0 errors, 1 pre-existing nullable warning in `Kernel.cs`
+- `E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless --path E:\Projects\RGSS-Godot --quit-after 5`
+- Output included `CONFIG:True,544x416` and `SCRIPTS_LOADED:OK`

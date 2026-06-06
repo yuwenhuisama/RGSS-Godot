@@ -1,0 +1,12 @@
+Task: T11 - RGSSLogger + lifetime-conventions
+
+Verification:
+- dotnet build E:\Projects\RGSS-Godot\RGSS-Godot.csproj -> 0 errors, 1 existing warning in Scripts/Kernel.cs
+- Headless Godot run:
+  - CONFIG:True,544x416
+  - SCRIPTS_LOADED:OK
+  - LOGGER_TEST:queued
+
+Notes:
+- RGSSLogger.Log("LOGGER_TEST:queued") followed by FlushPendingMessages() prints through GD.Print as expected.
+- BootManager now documents the future per-frame flush location in _Process().

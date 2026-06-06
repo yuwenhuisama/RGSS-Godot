@@ -1,0 +1,59 @@
+TASK: T6 - Capability Census
+DATE: 2026-06-06
+METHOD: Static code analysis (Unity Editor not installed; no runtime golden screenshots)
+STATUS: COMPLETE
+
+FILES_READ (C# bindings - Assets/Scripts/RubyClasses/):
+  Sprite.cs (776 lines)      - [RbClass("Sprite","Object","Unity")] L56 - FULL impl
+  Bitmap.cs (758 lines)      - [RbClass("Bitmap","Object","Unity")] L49 - FULL impl
+  Window.cs (1038 lines)     - [RbClass("Window","Object","Unity")] L178 - FULL impl (9-patch/cursor/arrows/pause)
+  Viewport.cs (383 lines)    - [RbClass("Viewport","Object","Unity")] L43 - FULL impl
+  Plane.cs (417 lines)       - [RbClass("Plane","Object","Unity")] L38 - FULL impl (disposed? cast bug L333)
+  Color.cs (117 lines)       - [RbClass("Color","Object","Unity")] L15 - FULL impl (blue=/alpha= *255 bug L97/L113)
+  Tone.cs (147 lines)        - [RbClass("Tone","Object","Unity")] L41 - FULL impl
+  Rect.cs (118 lines)        - [RbClass("Rect","Object","Unity")] L16 - FULL impl
+  Table.cs (198 lines)       - [RbClass("Table","Object","Unity")] L20 - FULL impl
+  Font.cs (193 lines)        - [RbClass("Font","Object","Unity")] L24 - FULL impl
+  Graphics.cs (349 lines)    - [RbModule("Graphics","Unity")] L21 - FULL except play_movie=NotImpl L342
+  Audio.cs (182 lines)       - [RbModule("Audio","Unity")] L7 - FULL except setup_midi=NotImpl L19
+  Input.cs (94 lines)        - [RbModule("Input","Unity")] L9 - FULL impl
+  UnityModule.cs (182 lines) - [RbModule("Unity","")] L13 - script loader + Fiber pump
+  Kernel.cs, RubyExtension.cs - infra (require/msgbox/GBK; RubyData base)
+  TILEMAP: NO Tilemap.cs EXISTS (glob RubyClasses/*.cs = 16 files, none Tilemap)
+
+FILES_READ (C# managers):
+  GameManager.cs (53)        - boot orchestrator (Start L14-39, Update L42-46)
+  GameRenderManager.cs (207) - per-frame viewport->RT compositor
+  GameAudioManager.cs (208)  - 4 AudioSources (BGM/BGS/ME/SE), ogg/wav/mp3/wma
+  RubyScriptManager.cs (171) - mruby lifecycle, 4 gem P/Invokes, Initialize L33
+  InputStateRecorder.cs (188)- double-buffered key state, RMVA repeat cadence L162
+  GameInputManager.cs (68)   - Assets ROOT; 20 PlayerInput handlers -> InputStateRecorder
+
+FILES_READ (Ruby wrappers - Assets/Resources/RGSS/):
+  main.rb (76)        - boot entry; requires 16 builtins L49-64 (tilemap NOT required)
+  patch_rmva.rb (177) - SceneManager Fiber loop + Audio/Cache/DataManager path reroute
+  type_check_util.rb (40), kernel.rb (31)
+  sprite.rb, bitmap.rb, window.rb, viewport.rb, plane.rb, audio.rb, input.rb, graphics.rb
+  tilemap.rb (72)     - L10 calls Unity::Tilemap.new (binding absent)
+
+GREP_CONFIRMATIONS:
+  RbClass("Tilemap" | RbModule("Tilemap"  => 0 matches (no native Tilemap binding)
+  Unity::Tilemap                            => 1 match: tilemap.rb:10
+  Tilemap.new (RMVA scripts)                => Spriteset_Map.rb:38, 49-Spriteset_Map-*.rb:37
+  GameInputManager (SampleScene.unity)      => 21 refs (PlayerInput events wired)
+  RbClass(|RbModule( in RubyClasses/        => 14 attrs across 14 binding files
+
+BINDINGS_ASSESSED: 14/14
+  WORKS(13): Sprite, Bitmap, Window, Viewport, Plane, Color, Tone, Rect, Table, Font, Graphics, Audio, Input
+  BROKEN(1): Tilemap (no C# binding + not required by main.rb)
+
+FLOWS_ASSESSED: 9
+  WORKS(8): Boot, Title, Main-menu-nav, Message-window, Battle, Save/Load, Audio, Input
+  BROKEN(1): Map-load (Tilemap)
+
+KNOWN_BUGS_NOTED_NOT_FIXED:
+  C#:   Color.cs:97 blue= *255 (should /255); Color.cs:113 alpha= *255; Plane.cs:333 disposed? casts SpriteData
+  Ruby: color.rb:65; audio.rb:47 (:set_stop typo->:se_stop, VERIFIED); viewport.rb:15 (rect.w. rect.h dot, VERIFIED);
+        bitmap.rb:66 (rect.w. rect.h dot, VERIFIED); font.rb:72/76; plane.rb:14 (@viewport nil ivar, VERIFIED)
+
+VERDICT: census written to .sisyphus/capability-census.md

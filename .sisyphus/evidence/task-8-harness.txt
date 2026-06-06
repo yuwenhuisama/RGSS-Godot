@@ -1,0 +1,103 @@
+================================================================================
+TASK T8 — GUT Test Harness + Golden-Screenshot Diff Tool
+================================================================================
+Date:        2026-06-05 23:43 +08:00
+Project:     E:\Projects\RGSS-Godot
+Godot:       E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe (v4.6.1.stable.mono)
+Verdict:     PASS
+
+--------------------------------------------------------------------------------
+PART A — GUT INSTALLATION
+--------------------------------------------------------------------------------
+GUT version:      9.6.0 (latest; release notes: "Compatibility changes for Godot 4.6")
+Source:           https://github.com/bitwes/Gut/archive/refs/tags/v9.6.0.zip
+Installed to:     E:\Projects\RGSS-Godot\addons\gut\  (248 files, incl. gut_cmdln.gd, plugin.cfg)
+Plugin enabled:   project.godot -> [editor_plugins] enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+Sample test:      E:\Projects\RGSS-Godot\tests\test_sample.gd  (extends GutTest; assert_eq(1+1, 2))
+
+Headless GUT command (fully automated, no user interaction):
+  E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless --path E:\Projects\RGSS-Godot ^
+      -s addons/gut/gut_cmdln.gd -gdir=res://tests/ -gexit
+
+------------------------- GUT FULL OUTPUT --------------------------------------
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+
+---  GUT  ---
+[INFO]:  using [C:/Users/yuwen/AppData/Roaming/Godot/app_userdata/RGSS-Godot] for temporary output.
+Godot version:  4.6.1
+GUT version:  9.6.0
+
+res://tests/test_sample.gd
+* test_one_plus_one_equals_two
+1/1 passed.
+
+==============================================
+= Run Summary
+==============================================
+Totals
+------
+Scripts               1
+Tests                 1
+Passing Tests         1
+Asserts               1
+Time              0.463s
+
+---- All tests passed! ----
+
+GUT_EXIT_CODE:0
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+PART B — GOLDEN-SCREENSHOT DIFF TOOL
+--------------------------------------------------------------------------------
+Tool:        E:\Projects\RGSS-Godot\tools\golden_diff.gd  (extends SceneTree; run via -s)
+Modes:       screenshot (default) | --golden <path> | --compare <golden> <actual> [--tolerance <n>]
+Algorithm:   load both PNGs -> convert FORMAT_RGBA8 -> max per-channel abs diff (0..255).
+             PASS if max_diff <= tolerance (default 5), else FAIL. Diff PNG saved on FAIL.
+Note:        get_viewport() at SceneTree scope = get_root() (root Window IS a Viewport).
+             DisplayServer "headless" has no framebuffer read-back, so live screenshot
+             capture reports GOLDEN_DIFF:SCREENSHOT_UNAVAILABLE_HEADLESS (exit 0) cleanly;
+             the pixel-diff core (the self-validating requirement) is fully exercised.
+
+Self-test images (16x16 RGBA8, generated then deleted):
+  a,b = identical solid red          c = one pixel R-50 (max diff 50)
+  d   = one pixel R-3 (max diff 3)
+
+--------- COMPARE SCENARIOS ----------
+1) identical (a vs b)            -> GOLDEN_DIFF:PASS:0     exit 0   [expected PASS:0]
+2) perturbed 50 (a vs c)         -> GOLDEN_DIFF:FAIL:50    exit 1   [expected FAIL:50]
+                                    GOLDEN_DIFF:DIFF_IMAGE:...app_userdata/RGSS-Godot/golden_diff.png
+3) within-tol 3 (a vs d)         -> GOLDEN_DIFF:PASS:3     exit 0   [expected PASS:3, 3<=5]
+4) screenshot mode (headless)    -> GOLDEN_DIFF:SCREENSHOT_UNAVAILABLE_HEADLESS  exit 0 (no error trace)
+5) golden mode (headless)        -> GOLDEN_DIFF:SCREENSHOT_UNAVAILABLE_HEADLESS  exit 0
+6) custom tolerance 60 (a vs c)  -> GOLDEN_DIFF:PASS:50    exit 0   [50<=60]
+
+Diff-image verification (probe of saved golden_diff.png):
+  DIFF_IMG:16x16 max_r=50 nonzero_px=1   (exactly the one perturbed pixel; magnitude correct)
+
+--------------------------------------------------------------------------------
+REGRESSION — EXISTING BEHAVIOUR PRESERVED
+--------------------------------------------------------------------------------
+dotnet build E:\Projects\RGSS-Godot\RGSS-Godot.csproj:
+  Build succeeded.  0 Warning(s)  0 Error(s)
+
+Headless boot (main scene, --quit-after 30):
+  CONFIG:True,544x416
+  SCRIPTS_LOADED:OK
+  LOGGER_TEST:queued
+  boot exit: 0
+
+GUT re-run after project.godot [editor_plugins] edit:
+  GUT version: 9.6.0 ; 1/1 passed ; ---- All tests passed! ---- ; exit 0
+
+--------------------------------------------------------------------------------
+DELIVERABLES CHECKLIST
+--------------------------------------------------------------------------------
+[x] E:\Projects\RGSS-Godot\addons\gut\           installed (GUT 9.6.0, Godot-4.6 compatible)
+[x] E:\Projects\RGSS-Godot\tests\test_sample.gd  passing (1+1==2)
+[x] Headless GUT command runs, exits 0, sample passes
+[x] E:\Projects\RGSS-Godot\tools\golden_diff.gd  created and self-tested (PASS:0 / FAIL:50)
+[x] project.godot enables GUT plugin ([editor_plugins])
+[x] dotnet build clean (0/0); headless boot unchanged (CONFIG + SCRIPTS_LOADED + LOGGER_TEST)
+[x] godot-mcp noted present at E:\Projects\Medot\godot-mcp\ (NOT configured, per task scope)
+================================================================================

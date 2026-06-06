@@ -1,0 +1,26 @@
+# Godot 4 .NET
+.godot/
+/export/
+/build/
+*.translation
+
+# .NET / MSBuild build output
+bin/
+obj/
+.mono/
+*.user
+*.userprefs
+
+# IDE
+.vs/
+.idea/
+*.suo
+*.csproj.user
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Mono crash logs
+mono_crash.*.json
+mono_crash.*.dmp

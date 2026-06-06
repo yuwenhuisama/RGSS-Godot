@@ -1,0 +1,36 @@
+TASK: T9 - Boot scene + Fiber pump on _Process + teardown
+DATE: 2026-06-06 00:02:30
+
+FILES CREATED:
+  E:\Projects\RGSS-Godot\Scripts\GameManager.cs - main game loop node
+  E:\Projects\RGSS-Godot\Scripts\UnityModule.cs - Unity:: module w/ fiber pump
+  E:\Projects\RGSS-Godot\Scripts\Graphics.cs - stub with WaitCount + Render()
+  Boot.tscn updated to reference GameManager.cs
+
+BUILD: dotnet build → 0 errors, 3 warnings (nullable, benign)
+  Compile fixes applied:
+    - RbValue is reference type (not struct) → removed .Value from UpdateFiber
+    - Graphics.WaitCount cast: (int)duration.ToIntUnchecked()
+    - exit_game: Engine.GetMainLoop() as SceneTree → tree.Quit()
+
+HEADLESS RUN (--quit-after 10):
+  OUTPUT:
+    CONFIG:True,544x416             ← GlobalConfig OK
+    SCRIPTS_LOADED:OK               ← VM + gems + ext/rpg scripts loaded
+    MAIN_LOADED:OK                  ← main.rb loaded successfully
+    ... kernel/tone/rect/color ...  ← built-in scripts requiring correctly
+    Error in script color: Exception  ← Ruby NoMethodError from missing Wave-2 bindings
+                                        (Bitmap, Sprite etc.) — EXPECTED, not T9 scope
+    Unhandled Ruby exception ...    ← caught via on_top_exception, VM survives
+  
+  EXIT: --quit-after 10 completed without native crash (PASS)
+
+VERDICT: PASS
+  - Fiber pump running each frame (process completes 10 frames)
+  - Ruby errors from missing bindings caught gracefully (mruby rescue → on_top_exception)
+  - No native crash / DLL exception
+  - GC.KeepAlive(func) pattern in place
+  - Clean teardown on _ExitTree
+
+KNOWN OPEN: main.rb:52 fails because Wave-2 bindings (Bitmap, Sprite, etc.) not yet
+  ported. Expected. Will resolve through T12-T24.

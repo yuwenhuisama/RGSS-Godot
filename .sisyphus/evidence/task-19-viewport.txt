@@ -1,0 +1,2 @@
+Fixed type errors in ViewportData.cs, Viewport.cs, and GameAudioManager.cs. Replaced Tone/FlashColor eager construction with nullable fields, switched GlobalConfig access to Instance, made tone/color reads null-safe, and changed GD.LinearToDb to Mathf.LinearToDb. Verified with dotnet build RGSS-Godot.csproj: 0 errors, 7 warnings.
+viewport error fixed

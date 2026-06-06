@@ -1,0 +1,52 @@
+T17 Sprite + T21 Graphics evidence
+Date: 2026-06-06T04:28:52.5850479+08:00
+
+COMMAND: dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj"
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  RGSS-Godot -> E:\Projects\RGSS-Godot\.godot\mono\temp\bin\Debug\RGSS-Godot.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.64
+
+COMMAND: E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless --path "E:\Projects\RGSS-Godot" --quit-after 10
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+
+RMPROJECT_PATH:E:\Projects\RGSS-Godot
+CONFIG:True,544x416
+SCRIPTS_LOADED:OK
+Initialize RGSS3 scripts...
+RMVA project path: E:\Projects\RGSS-Godot
+RTP path: F:/Softwares/RPG Maker VX Ace/RTP
+Loaded script: kernel
+Loaded script: tone
+Loaded script: type_check_util
+Loaded script: rect
+Loaded script: color
+Loaded script: font
+Loaded script: graphics
+Loaded script: input
+Loaded script: audio
+Loaded script: sprite
+Loaded script: bitmap
+Loaded script: viewport
+Loaded script: plane
+Loaded script: window
+Loaded script: table
+Loaded script: rgss_error
+Loaded script: rgss_reset
+MAIN_LOADED:OK
+Unhandled Ruby exception happened in script:
+ Exception: No such file or directory - open E:\Projects\RGSS-Godot/RMProject/Data/Scripts.rvdata2 
+Backtrace: 
+	main.rb:37:in sysopen
+	main.rb:37:in run_scripts
+	main.rb:66
+
+	Script name: main.rb 
+	Line number: 37 
+
+

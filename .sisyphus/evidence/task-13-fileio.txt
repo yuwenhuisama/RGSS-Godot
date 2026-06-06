@@ -1,0 +1,6 @@
+Task 13 evidence
+Date: 2026-06-06T00:23:15.5162313+08:00
+Build: PASS (0 errors)
+Headless: PASS for boot markers
+RMPROJECT_PATH: E:\Projects\RGSS-Godot
+Notes: pre-existing viewport require exception occurs after MAIN_LOADED:OK

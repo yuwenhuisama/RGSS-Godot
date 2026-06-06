@@ -1,0 +1,34 @@
+Task: T18 - Window binding for RGSS-Unity -> Godot 4 migration
+Date: 2026-06-06
+
+Files changed:
+- E:\Projects\RGSS-Godot\Scripts\RubyClasses\WindowData.cs
+- E:\Projects\RGSS-Godot\Scripts\RubyClasses\Window.cs
+- E:\Projects\RGSS-Godot\Scripts\GameRenderManager.cs
+
+Implementation summary:
+- Replaced the 10-line WindowData stub with RGSS window state fields, nullable BitmapData/ViewportData/RectData/ToneData references, disposal state, and a Godot Node2D reference.
+- Added Unity::Window binding with new_with_viewport and new_xywh constructors, dispose/disposed?, update, open?/close?, viewport, bitmap/tone/rect accessors, geometry, visibility, activity, pause, arrows_visible, opacity, openness, and padding methods.
+- Added GameRenderManager RegisterWindow/UnregisterWindow, pending window flushing in Update(), and windows/pendingWindows cleanup in Dispose(). RenderWindow remains a visual stub as required for later T26 scope.
+
+Diagnostics:
+- Attempted lsp_diagnostics on all modified C# files.
+- Result: blocked because csharp-ls is not installed in the environment: "LSP server 'csharp' is configured but NOT INSTALLED. Command not found: csharp-ls".
+
+Build verification:
+- Command: dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj" 2>&1
+- Result: Build succeeded, 0 Error(s), 7 Warning(s).
+- Warnings were in pre-existing unrelated files: RubyExtension.cs, Kernel.cs, Font.cs, UnityModule.cs, Bitmap.cs.
+
+Headless boot verification:
+- Command: E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless --path "E:\Projects\RGSS-Godot" --quit-after 10
+- Required markers observed:
+  - SCRIPTS_LOADED:OK
+  - Loaded script: window
+  - MAIN_LOADED:OK
+- Later runtime exception observed: missing E:\Projects\RGSS-Godot/RMProject/Data/Scripts.rvdata2. This occurs after MAIN_LOADED:OK and is absent sample RMVA game data, unrelated to the Window binding.
+
+Outcome:
+- dotnet build: PASS (0 errors)
+- Godot headless boot markers: PASS (SCRIPTS_LOADED:OK + MAIN_LOADED:OK)
+- Ruby window.rb boot crash: resolved for the binding load path; window.rb loads successfully.

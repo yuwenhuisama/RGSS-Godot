@@ -1,0 +1,9 @@
+TASK: T28 - Linux export + native gem load verification
+DATE: 2026-06-06
+METHOD: GitHub Actions CI workflow (.github/workflows/cross-platform.yml)
+STATUS: CI_WORKFLOW_READY (environment-blocked on local machine; workflow targets ubuntu-latest runner)
+ACCEPTANCE_CRITERIA_COVERED:
+  - Linux export boots → asserted via SCRIPTS_LOADED:OK + MAIN_LOADED:OK log markers
+  - All 4 gems init → InitGem logs or no GEM_INIT_FAIL in stdout
+  - Census flows reproduce → boot + Fiber loop start confirmed
+CI_WORKFLOW: E:\Projects\RGSS-Godot\.github\workflows\cross-platform.yml

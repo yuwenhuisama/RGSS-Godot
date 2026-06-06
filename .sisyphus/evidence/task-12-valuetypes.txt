@@ -1,0 +1,6 @@
+## [2026-06-06 00:00:00] Task: T12 - Value Types
+- Created `Scripts/RubyClasses/Color.cs`, `Tone.cs`, `Rect.cs`, `Table.cs`, and `Font.cs` in RGSS-Godot.
+- Replaced Unity storage with .NET-friendly raw fields: Color uses four floats, Tone uses `System.Numerics.Vector4`, Rect uses four ints, Table uses int dimensions + int[] data, Font stores name/size/style flags plus color channels as floats.
+- Preserved the original parity bugs in `Color.set_rgba`, `Color.blue=`, `Color.alpha=`, and the Font accessor behavior requested for parity.
+- Verified with `dotnet build E:\Projects\RGSS-Godot\RGSS-Godot.csproj` -> 0 errors.
+- Verified headless boot reaches `SCRIPTS_LOADED:OK` and `MAIN_LOADED:OK`; current runtime failure occurs later while requiring `viewport`, outside this task scope.

@@ -1,0 +1,53 @@
+# Task 16 - Bitmap Binding Evidence
+
+Timestamp: 2026-06-06
+Project: E:\Projects\RGSS-Godot
+
+Implemented files:
+- E:\Projects\RGSS-Godot\Scripts\RubyClasses\BitmapData.cs
+- E:\Projects\RGSS-Godot\Scripts\RubyClasses\Bitmap.cs
+
+Implementation summary:
+- BitmapData now holds Godot Image + ImageTexture, Width/Height, Dirty, FontData, disposed state.
+- Mutations call BitmapData.MarkDirty(), which sets Dirty=true and adds the data to GameRenderManager.DirtyBitmapDataSet.
+- UpdateTexture() calls ImageTexture.Update(Image) and clears Dirty.
+- Bitmap binding added with [RbClass("Bitmap", "Object", "Unity")].
+- Implemented: new_wh, new_filename, dispose/disposed?, width/height, font/font=, rect/rect=, blt, stretch_blt, fill_rect, clear_rect, clear, get_pixel, set_pixel, hue_change, blur, radial_blur, draw_text, gradient_fill_rect, text_size.
+- Image loading uses RMProjectPath.Resolve(filename) and Image.LoadFromFile(absPath).
+- Blank bitmap uses Image.Create(w, h, false, Image.Format.Rgba8) as required.
+- No UnityEngine types are used.
+
+Verification:
+1. LSP diagnostics
+   - Attempted on BitmapData.cs and Bitmap.cs.
+   - Environment result: csharp-ls is not installed, so LSP diagnostics were unavailable.
+   - Fallback validation: dotnet build was used for compiler diagnostics.
+
+2. dotnet build
+   Command:
+   dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj" 2>&1
+   Result:
+   Build succeeded with 0 errors.
+   Warnings: 9 total, all existing project nullability warnings plus one expected Bitmap.cs warning because the task explicitly required obsolete Image.Create instead of Image.CreateEmpty.
+
+3. Headless Godot boot
+   Command:
+   E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe --headless --path "E:\Projects\RGSS-Godot" --quit-after 10 2>&1
+   Result:
+   - SCRIPTS_LOADED:OK
+   - MAIN_LOADED:OK
+   - No native crash.
+   - Existing downstream viewport require exception still appears after MAIN_LOADED:OK; this is pre-existing and unrelated to Bitmap.
+
+4. Bitmap smoke test
+   Method:
+   Temporarily added a BitmapSmokeRunner scene, ran Ruby:
+     bmp = Bitmap.new(100, 100)
+     bmp.fill_rect(0, 0, 10, 10, Color.new(12, 34, 56, 255))
+     c = bmp.get_pixel(5, 5)
+   Result:
+   BITMAP_SMOKE:OK
+   Cleanup:
+   Temporary smoke runner files were deleted after the successful test; final build was rerun clean.
+
+Final status: PASS for T16 Bitmap binding implementation.

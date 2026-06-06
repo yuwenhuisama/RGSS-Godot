@@ -1,0 +1,38 @@
+T1 — Godot .NET P/Invoke Export Spike
+Date: 2026-06-05 18:51:40
+Result: PASS
+
+=== Headless Editor Run ===
+Command: "E:\Godot\Godot_v4.6.1-stable_mono_win64_console.exe" --headless --path "E:\Projects\RGSS-GodotSpike" --quit-after 5
+Output: "PING_OK:pong"
+Status: PASS
+
+=== Exported Debug Binary ===
+Command: "E:\Projects\RGSS-GodotSpike\Builds\WindowsDebug3\RGSS-GodotSpike.console.exe" --headless --quit-after 15
+Output: "PING_OK:pong"
+Status: PASS
+
+=== Exported Release Binary (trim-enabled) ===
+Command: "E:\Projects\RGSS-GodotSpike\Builds\WindowsRelease\RGSS-GodotSpike.exe" --headless --quit-after 15
+Log: PING_OK:pong (confirmed via Godot app log)
+Status: PASS
+
+=== Configuration ===
+Godot: 4.6.1.stable.mono
+.NET SDK: 10.0.204
+MRuby.Library: v0.1.7
+DllImport: libmruby_marshal_c_ext_x64, libmruby_dir_glob_ext_x64, libmruby_onig_regexp_ext_x64, libmruby_zlib_ext_x64
+Platform: Windows x86_64
+Project: E:\Projects\RGSS-GodotSpike
+
+=== Key Findings ===
+1. Ruby.Open() succeeds in all build modes
+2. [RbModule("Unity")] + [RbModuleMethod("ping")] -> Ruby-callable Unity.ping method works
+3. gem DllImports resolve via NativeLibrary.SetDllImportResolver with data_*/Plugins/windows/ path
+4. IL trimming (TrimMode=partial) + TrimmerRootAssembly + [DynamicDependency] preserves types
+5. Godot .NET export requires .sln file (not .slnx) in project dir
+6. Mono export templates required (4.6.1.stable.mono), NOT standard templates
+7. Must run headless once BEFORE export to warm the import cache (scene binary compilation)
+8. Console wrapper (.console.exe) only generated for Debug export; Release uses main .exe with log file
+
+VERDICT: GO — A1 mruby route confirmed feasible in exported Godot builds

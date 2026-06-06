@@ -1,0 +1,84 @@
+T24 — Unity effect shader translation to Godot 4
+Date: 2026-06-06
+
+Source inventory read:
+- Read shader contract: E:\Projects\RGSS-Unity\Assets\Shaders\AGENTS.md
+- Read render conventions: E:\Projects\RGSS-Godot\docs\render-conventions.md
+- Read all 15 Unity shader sources from E:\Projects\RGSS-Unity\Assets\Shaders\:
+  1. SpriteShader.shader
+  2. WindowBackgroundShader.shader
+  3. PlaneShader.shader
+  4. TiledBackgroundShader.shader
+  5. GraphicsPostprocessShader.shader
+  6. TransitionPostprocessShader.shader
+  7. ViewportShader.shader
+  8. SpriteMaskShader.shader
+  9. FillRectShader.shader
+  10. StretchBltShader.shader
+  11. HueChangeShader.shader
+  12. BlurShader.shader
+  13. BitmapClearShader.shader
+  14. GradientFillRectShader.shader
+  15. RadiaBlurShader.shader
+- C# shader reference grep found active runtime references in Sprite.cs, Window.cs, Plane.cs, Viewport.cs, Graphics.cs, GameRenderManager.cs, and Bitmap.cs. ShaderTest.cs contains only a commented radial blur reference.
+
+Output directory:
+- Created/used E:\Projects\RGSS-Godot\Shaders\
+
+Ported runtime Godot shaders:
+- E:\Projects\RGSS-Godot\Shaders\SpriteShader.gdshader
+  - shader_type canvas_item
+  - M4 packed instance uniforms: _PackedA, _PackedB, _PackedC, _PackedD
+  - Preserves Unity order: mirror -> wave -> gray -> tone -> opacity -> color -> bush -> flash
+- E:\Projects\RGSS-Godot\Shaders\WindowBackgroundShader.gdshader
+  - shader_type canvas_item
+  - tone/gray overlay matching Unity WindowBackgroundShader
+- E:\Projects\RGSS-Godot\Shaders\PlaneShader.gdshader
+  - shader_type canvas_item
+  - tiled UV modulo plus uv_offset/TIME scroll support, tone, and mix_color
+- E:\Projects\RGSS-Godot\Shaders\TiledBackgroundShader.gdshader
+  - shader_type canvas_item
+  - tiled UV modulo plus uv_offset/TIME scroll support and tone
+- E:\Projects\RGSS-Godot\Shaders\GraphicsPostprocessShader.gdshader
+  - shader_type canvas_item
+  - M2 postprocess uses SCREEN_TEXTURE with hint_screen_texture and textureLod(..., 0.0)
+- E:\Projects\RGSS-Godot\Shaders\TransitionPostprocessShader.gdshader
+  - shader_type canvas_item
+  - M2 postprocess uses SCREEN_TEXTURE for the new frame and frozen_tex/transition_tex for Unity's transition blend math
+- E:\Projects\RGSS-Godot\Shaders\ViewportShader.gdshader
+  - shader_type canvas_item
+  - viewport tone and flash overlay
+- E:\Projects\RGSS-Godot\Shaders\SpriteMaskShader.gdshader
+  - shader_type canvas_item
+  - alpha cutout/region mask helper
+
+Documented but intentionally not ported:
+- FillRectShader.shader — implemented CPU-side in Bitmap.cs, shader not needed.
+- StretchBltShader.shader — implemented CPU-side in Bitmap.cs, shader not needed.
+- HueChangeShader.shader / Custom/HueShiftShader — implemented CPU-side in Bitmap.cs, shader not needed.
+- BlurShader.shader — implemented CPU-side in Bitmap.cs, shader not needed.
+- BitmapClearShader.shader — implemented CPU-side in Bitmap.cs, shader not needed.
+- GradientFillRectShader.shader — implemented CPU-side in Bitmap.cs, shader not needed.
+- RadiaBlurShader.shader / Custom/RadialBlurShader — implemented CPU-side in Bitmap.cs, shader not needed. Only non-Bitmap.cs reference is a commented ShaderTest.cs line.
+- Documentation written to E:\Projects\RGSS-Godot\Shaders\README.md
+
+Generated directory inventory:
+- GraphicsPostprocessShader.gdshader
+- PlaneShader.gdshader
+- README.md
+- SpriteMaskShader.gdshader
+- SpriteShader.gdshader
+- TiledBackgroundShader.gdshader
+- TransitionPostprocessShader.gdshader
+- ViewportShader.gdshader
+- WindowBackgroundShader.gdshader
+
+Notepad update:
+- Appended findings to E:\Projects\RGSS-Unity\.sisyphus\notepads\unity-to-godot-migration\learnings.md
+
+Verification:
+- lsp_diagnostics on E:\Projects\RGSS-Godot\Shaders was attempted, but this environment has no LSP server configured for .gdshader or .md resources. No shader-language diagnostics are available through the configured LSP set.
+- Read-back validation completed for all generated .gdshader files and README.md.
+- Required build command:
+  dotnet build "E:\Projects\RGSS-Godot\RGSS-Godot.csproj"
+  Result: Build succeeded, 0 Warning(s), 0 Error(s), elapsed 00:00:00.66.

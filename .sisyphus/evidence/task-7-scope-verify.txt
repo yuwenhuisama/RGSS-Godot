@@ -1,0 +1,28 @@
+TASK: T7 - Scope Verification (Tilemap absent / Input wired)
+DATE: 2026-06-05 23:19:51
+
+VERDICT: CONFIRMED
+
+=== TILEMAP BINDING ===
+SEARCH: grep "class Tilemap|RbClass.*Tilemap|RbModule.*Tilemap" Assets/**/*.cs
+RESULT: NO MATCHES
+CONCLUSION: Tilemap C# binding is ABSENT — out of scope (port-the-absence).
+
+=== INPUT WIRING ===
+SEARCH: grep "SetPress|SetRelease" Assets/**/*.cs
+RESULT:
+  E:\Projects\RGSS-Unity\Assets\GameInputManager.cs:59  → InputStateRecorder.Instance.SetPress(key)
+  E:\Projects\RGSS-Unity\Assets\GameInputManager.cs:64  → InputStateRecorder.Instance.SetRelease(key)
+  E:\Projects\RGSS-Unity\Assets\Scripts\InputStateRecorder.cs:64 → internal void SetPress(InputKey key)
+  E:\Projects\RGSS-Unity\Assets\Scripts\InputStateRecorder.cs:74 → internal void SetRelease(InputKey key)
+
+SEARCH: grep "GameInputManager" Assets/**/*.unity
+RESULT:
+  SampleScene.unity contains 21 references to RGSSUnity.GameInputManager (m_TargetAssemblyTypeName)
+  Wiring confirmed at lines 1092–1412 — 20+ Input System action bindings.
+
+CONCLUSION: Input IS wired and functional. Port as WORKING (in scope for T23).
+
+FINAL SCOPE:
+  - Unity::Tilemap → ABSENT → OUT OF SCOPE (do not implement)
+  - Input (GameInputManager + InputStateRecorder) → PRESENT + WIRED → IN SCOPE for T23

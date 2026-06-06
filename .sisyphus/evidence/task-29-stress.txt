@@ -1,0 +1,14 @@
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+
+RMPROJECT_PATH:E:\Projects\RGSS-Unity\Assets\StreamingAssets
+Loaded RMVA script: stress_dispose
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+Loaded RMVA script: stress_dispose_gc
+STRESS_COUNTS baseline_nodes=0 after_nodes=7 viewports=0 sprites=0 windows=0 managed_memory_before=1574312 managed_memory_after=1137112
+STRESS_PASS

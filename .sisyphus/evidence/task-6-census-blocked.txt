@@ -1,0 +1,16 @@
+TASK: T6 - Capability Census
+DATE: 2026-06-05 23:19:51
+
+STATUS: BLOCKED
+
+REASON: Unity Editor is not installed at any known path on this machine.
+  - C:\Program Files\Unity\ → NOT FOUND
+  - Unity Hub presence unknown, no Unity.exe found
+  - Cannot run Unity in batchmode or interactive to capture golden screenshots / census flows
+
+WORKAROUND:
+  - T6 evidence will be deferred until Unity is accessible (T27/T28 integration phase, or user provides access)
+  - Parity scope will be informed by code-reading + known behaviors from plan/interviews instead
+  - Golden screenshots deferred to T26 (full boot integration test on Windows when project is more complete)
+
+IMPACT: F3 (parity QA final wave) will need this addressed. Logged as blocker.

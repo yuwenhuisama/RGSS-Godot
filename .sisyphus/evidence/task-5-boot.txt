@@ -1,0 +1,17 @@
+TASK: T5 - Godot project scaffold + boot (SCRIPTS_LOADED:OK)
+DATE: 2026-06-05 23:16:44
+
+BUILD:
+  dotnet build RGSS-Godot.csproj → 0 errors, 1 warning (nullable ref, benign)
+
+HEADLESS RUN:
+  Godot_v4.6.1-stable_mono_win64_console.exe --headless --path E:\Projects\RGSS-Godot --quit-after 10
+  OUTPUT: SCRIPTS_LOADED:OK
+
+FIXES APPLIED (compile errors from prior write):
+  - RbContext? (nullable struct) instead of RbContext = null!
+  - context.Value.SetFilename / compiler.LoadString(…, context.Value) patterns
+  - System.Environment (explicit) to avoid Godot.Environment ambiguity
+  - using System; added to Kernel.cs for InvalidOperationException
+
+VERDICT: PASS
