@@ -42,3 +42,7 @@ mruby-ext/**/*.dylib
 mruby-ext/**/*.a
 mruby-ext/**/*.exp
 mruby-ext/**/*.pdb
+
+# Godot UID sidecars for vendored DotZLib C# (excluded from compile in
+# RGSS-Godot.csproj, so these are editor-generated noise, not project assets).
+mruby-ext/**/*.cs.uid

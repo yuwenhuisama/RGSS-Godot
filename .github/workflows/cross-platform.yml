@@ -20,12 +20,12 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - name: Checkout RGSS-Godot
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: RGSS-Godot
 
       - name: Install .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -199,7 +199,7 @@ jobs:
           ! grep -q "GEM_INIT_FAIL" evidence/headless-macos.log
           {
             echo "TASK:T27 macOS cross-platform verification"
-            echo "RUNNER:macos-13"
+            echo "RUNNER:macos-15-intel"
             echo "EXPORT:export/RGSS-Godot-macos.zip"
             echo "ASSERT:SCRIPTS_LOADED:OK"
             echo "ASSERT:MAIN_LOADED:OK"
@@ -208,7 +208,7 @@ jobs:
           } > evidence/t27-macos-ci.txt
 
       - name: Upload macOS evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: t27-macos-evidence
           path: RGSS-Godot/evidence/
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout RGSS-Godot
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: RGSS-Godot
 
@@ -229,7 +229,7 @@ jobs:
           sudo apt-get install -y build-essential ruby bison libreadline-dev libssl-dev zlib1g-dev unzip
 
       - name: Install .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -368,7 +368,7 @@ jobs:
           } > evidence/t28-linux-ci.txt
 
       - name: Upload Linux evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: t28-linux-evidence
           path: RGSS-Godot/evidence/

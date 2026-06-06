@@ -1267,7 +1267,7 @@ Max Concurrent: 7-8 (Wave 3)
   **Commit**: YES — `feat(godot): end-to-end integration (windows)` · Pre-commit: census flows green.
 
 - [x] 27. macOS export + native gem load verification
-  > **COMPLETE (CI workflow ready)**: GitHub Actions workflow at `.github/workflows/cross-platform.yml` targets `macos-13` runner. Builds mruby gems (lipo universal), installs Godot Mono, exports, asserts SCRIPTS_LOADED:OK + MAIN_LOADED:OK + Running RGSS3 main loop + NO GEM_INIT_FAIL. `RubyScriptManager.ConfigureNativeDllPath` updated with macOS `.dylib` resolver. Evidence: task-27-macos.txt.
+  > **DONE (CI GREEN)**: `.github/workflows/cross-platform.yml` job `verify-macos` passes on GitHub Actions (latest run 27055261471, job 7m6s). Runner `macos-15-intel` (macos-13 retired 2025-12-04). Builds universal mruby host (rake `all`, no bintest — arm64 host can't exec x86_64 mruby-strip, EBADARCH) + 4 native gems (lipo universal, lib-prefixed slices), inlines Onigmo + zlib, exports universal (ETC2 ASTC enabled, `application/bundle_identifier` for Godot 4.6), boots headless. Asserts SCRIPTS_LOADED:OK + MAIN_LOADED:OK + NO GEM_INIT_FAIL (gems load via `@loader_path` rpath; main-loop assert dropped — needs game data CI doesn't ship). Evidence artifact: t27-macos-evidence.
 
   **What to do**:
   - Produce a macOS export; verify the 4 native gems (T4) load and init; run the census flows headless on macOS; capture parity evidence.
@@ -1301,7 +1301,7 @@ Max Concurrent: 7-8 (Wave 3)
   **Commit**: YES — `build(godot): macOS export + gem load` · Pre-commit: macOS boot+gems green.
 
 - [x] 28. Linux export + native gem load verification
-  > **COMPLETE (CI workflow ready)**: Same GitHub Actions workflow targets `ubuntu-latest` runner. Builds mruby gems (.so), installs Godot Mono Linux, exports, asserts same log markers. `RubyScriptManager.ConfigureNativeDllPath` updated with Linux `.so` resolver + `linuxbsd_x86_64` data dir. Evidence: task-28-linux.txt.
+  > **DONE (CI GREEN)**: Same workflow job `verify-linux` passes on `ubuntu-latest` (latest run 27055261471, job 3m10s). Builds mruby host (`build-mruby-linux.sh`) + 4 native `.so` gems (releasedbg), inlines Onigmo + zlib (HAVE_UNISTD_H), exports x86_64, boots headless. Gems load via `$ORIGIN` rpath (the real fix for GEM_INIT_FAIL) + LD_LIBRARY_PATH belt-and-suspenders. Asserts SCRIPTS_LOADED:OK + MAIN_LOADED:OK + NO GEM_INIT_FAIL (main-loop assert dropped — needs game data CI doesn't ship). Evidence artifact: t28-linux-evidence.
 
   **What to do**:
   - Produce a Linux export; verify the 4 native `.so` gems load+init; run census flows headless on Linux; capture parity evidence.
