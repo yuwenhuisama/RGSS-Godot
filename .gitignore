@@ -24,3 +24,21 @@ Thumbs.db
 # Mono crash logs
 mono_crash.*.json
 mono_crash.*.dmp
+
+# mruby-ext native gem build inputs/outputs (per mruby-ext/AGENTS.md:
+# lib/, build/, .xmake/ are gitignored; host .lib/.so/.dylib are prebuilt,
+# not produced here). Keep vendored SOURCE (.c/.h/config.h/export.def/xmake.lua).
+mruby-ext/**/lib/
+mruby-ext/**/build/
+mruby-ext/**/build_x64/
+mruby-ext/**/.xmake/
+mruby-ext/**/.cache/
+mruby-ext/**/*.o
+mruby-ext/**/*.obj
+mruby-ext/**/*.lib
+mruby-ext/**/*.dll
+mruby-ext/**/*.so
+mruby-ext/**/*.dylib
+mruby-ext/**/*.a
+mruby-ext/**/*.exp
+mruby-ext/**/*.pdb

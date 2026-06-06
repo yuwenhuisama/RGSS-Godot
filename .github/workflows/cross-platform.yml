@@ -17,19 +17,12 @@ env:
 jobs:
   verify-macos:
     name: Verify macOS export and boot
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Checkout RGSS-Godot
         uses: actions/checkout@v4
         with:
           path: RGSS-Godot
-
-      - name: Checkout RGSS-Unity mruby-ext source
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/RGSS-Unity
-          path: RGSS-Unity
-          submodules: recursive
 
       - name: Install .NET 8 SDK
         uses: actions/setup-dotnet@v4
@@ -58,17 +51,17 @@ jobs:
           MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
         run: |
           set -euxo pipefail
-          mkdir -p RGSS-Unity/mruby-ext/{marshal,glob,regexp,zlib}/lib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/marshal/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/glob/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/regexp/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Unity/mruby-ext/zlib/lib/libmruby_x64.dylib
-          cd RGSS-Unity/mruby-ext
+          mkdir -p RGSS-Godot/mruby-ext/{marshal,glob,regexp,zlib}/lib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Godot/mruby-ext/marshal/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Godot/mruby-ext/glob/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Godot/mruby-ext/regexp/lib/libmruby_x64.dylib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib RGSS-Godot/mruby-ext/zlib/lib/libmruby_x64.dylib
+          cd RGSS-Godot/mruby-ext
           xmake f -m releasedbg
           xmake
-          mkdir -p ../../RGSS-Godot/Plugins/macos
-          cp build/macosx/universal/releasedbg/libmruby_*_ext_x64.dylib ../../RGSS-Godot/Plugins/macos/
-          cp ../../mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib ../../RGSS-Godot/Plugins/macos/
+          mkdir -p ../Plugins/macos
+          cp build/macosx/universal/releasedbg/libmruby_*_ext_x64.dylib ../Plugins/macos/
+          cp ../../mruby-for-dotnet/mruby-shared/build/macosx/universal/releasedbg/libmruby_x64.dylib ../Plugins/macos/
 
       - name: Install Godot 4.6.1 stable mono
         shell: bash
@@ -208,13 +201,6 @@ jobs:
         with:
           path: RGSS-Godot
 
-      - name: Checkout RGSS-Unity mruby-ext source
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/RGSS-Unity
-          path: RGSS-Unity
-          submodules: recursive
-
       - name: Install Linux build tools
         shell: bash
         run: |
@@ -248,17 +234,17 @@ jobs:
           MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
         run: |
           set -euxo pipefail
-          mkdir -p RGSS-Unity/mruby-ext/{marshal,glob,regexp,zlib}/lib
-          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/marshal/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/glob/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/regexp/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Unity/mruby-ext/zlib/lib/libmruby_x64.so
-          cd RGSS-Unity/mruby-ext
+          mkdir -p RGSS-Godot/mruby-ext/{marshal,glob,regexp,zlib}/lib
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/marshal/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/glob/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/regexp/lib/libmruby_x64.so
+          cp mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/zlib/lib/libmruby_x64.so
+          cd RGSS-Godot/mruby-ext
           xmake f -m releasedbg
           xmake
-          mkdir -p ../../RGSS-Godot/Plugins/linux
-          cp build/linux/x86_64/releasedbg/libmruby_*_ext_x64.so ../../RGSS-Godot/Plugins/linux/
-          cp ../../mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so ../../RGSS-Godot/Plugins/linux/
+          mkdir -p ../Plugins/linux
+          cp build/linux/x86_64/releasedbg/libmruby_*_ext_x64.so ../Plugins/linux/
+          cp ../../mruby-for-dotnet/mruby-shared/build/linux/x86_64/releasedbg/libmruby_x64.so ../Plugins/linux/
 
       - name: Install Godot 4.6.1 stable mono
         shell: bash
