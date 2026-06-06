@@ -208,7 +208,7 @@ jobs:
           } > evidence/t27-macos-ci.txt
 
       - name: Upload macOS evidence
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: t27-macos-evidence
           path: RGSS-Godot/evidence/
@@ -368,7 +368,7 @@ jobs:
           } > evidence/t28-linux-ci.txt
 
       - name: Upload Linux evidence
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: t28-linux-evidence
           path: RGSS-Godot/evidence/
