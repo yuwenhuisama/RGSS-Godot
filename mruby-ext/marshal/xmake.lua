@@ -39,6 +39,12 @@ target(ext_base_name .. "_ext_x64")
         set_basename(ext_base_name .. "_ext_x64")
         add_links("lib/libmruby_x64.so")
     elseif os_name == "macosx" then
+        -- On macOS the public _ext_x64 target is only an alias for the universal
+        -- dylib build; without this it defaults to a binary target and fails to
+        -- link (no _main). Make it a phony that depends on the universal target.
+        set_kind("phony")
+        add_deps(ext_base_name .. "_ext_universal")
+
         -- Build for x86_64
         target(ext_base_name .. "_ext_x86_64")
             common_settings()

@@ -78,7 +78,9 @@ jobs:
           set -euxo pipefail
           curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_macos.universal.zip
           unzip -q godot.zip -d godot
-          GODOT_BIN=$(find godot -name Godot -type f | head -n 1)
+          # Absolute path: later steps run with working-directory: RGSS-Godot,
+          # so a relative GODOT_BIN (godot/...) would not resolve there.
+          GODOT_BIN="$(pwd)/$(find godot -name Godot -type f | head -n 1)"
           chmod +x "$GODOT_BIN"
           echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
           curl -L -o export_templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_export_templates.tpz
@@ -261,7 +263,9 @@ jobs:
           set -euxo pipefail
           curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_linux_x86_64.zip
           unzip -q godot.zip -d godot
-          GODOT_BIN=$(find godot -name Godot_v${GODOT_VERSION_STATUS}_mono_linux.x86_64 -type f | head -n 1)
+          # Absolute path: later steps run with working-directory: RGSS-Godot,
+          # so a relative GODOT_BIN (godot/...) would not resolve there.
+          GODOT_BIN="$(pwd)/$(find godot -name Godot_v${GODOT_VERSION_STATUS}_mono_linux.x86_64 -type f | head -n 1)"
           chmod +x "$GODOT_BIN"
           echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
           curl -L -o export_templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION_STATUS}/Godot_v${GODOT_VERSION_STATUS}_mono_export_templates.tpz
