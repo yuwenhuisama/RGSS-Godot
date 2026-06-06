@@ -238,6 +238,18 @@ public sealed class GameRenderManager : IDisposable
                 this.UnregisterWindow(window);
         }
 
+        foreach (var plane in new List<PlaneData>(this.planes.Keys))
+        {
+            if (ReferenceEquals(plane.Viewport, data))
+                this.UnregisterPlane(plane);
+        }
+
+        foreach (var plane in new List<PlaneData>(this.pendingPlanes))
+        {
+            if (ReferenceEquals(plane.Viewport, data))
+                this.UnregisterPlane(plane);
+        }
+
         entry.Wrapper.QueueFree();
         entry.SubViewport.QueueFree();
     }
@@ -474,10 +486,306 @@ public sealed class GameRenderManager : IDisposable
 
     public static void RenderPlane(PlaneData data)
     {
+        var node = data.Node as PlaneDataNode;
+        if (node is null || data.Disposed)
+            return;
+
+        if (data.Bitmap is { Dirty: true })
+            data.Bitmap.UpdateTexture();
+
+        var drawable = GetOrCreatePlaneDrawable(node, data.BlendType);
+        var bitmap = data.Bitmap;
+        var hasBitmap = bitmap is { Disposed: false, Texture: not null, Width: > 0, Height: > 0 };
+        var viewportSize = GetNodeRenderSize(node);
+
+        node.ZIndex = data.Z;
+        node.Visible = data.Visible && hasBitmap;
+
+        drawable.Visible = node.Visible;
+        drawable.Texture = hasBitmap ? bitmap!.Texture : null;
+        drawable.Size = viewportSize;
+        drawable.ZIndex = data.Z;
+        drawable.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.Opacity));
+
+        if (!hasBitmap)
+            return;
+
+        if (drawable.Material is not ShaderMaterial material || material.ResourceName != GetPlaneMaterialName(data.BlendType))
+        {
+            material = CreatePlaneMaterial(data.BlendType);
+            drawable.Material = material;
+        }
+
+        var zoomX = Math.Abs(data.ZoomX) > 0.0001f ? data.ZoomX : 1.0f;
+        var zoomY = Math.Abs(data.ZoomY) > 0.0001f ? data.ZoomY : 1.0f;
+        material.SetShaderParameter("mix_color", ToGodotColor(data.Color));
+        material.SetShaderParameter("tone", new Vector4(data.Tone?.Red ?? 0.0f, data.Tone?.Green ?? 0.0f, data.Tone?.Blue ?? 0.0f, data.Tone?.Gray ?? 0.0f));
+        material.SetShaderParameter("tile_scale", new Vector2(viewportSize.X / bitmap!.Width / zoomX, viewportSize.Y / bitmap.Height / zoomY));
+        material.SetShaderParameter("uv_offset", new Vector2(data.Ox / Math.Max(1.0f, viewportSize.X), data.Oy / Math.Max(1.0f, viewportSize.Y)));
+        material.SetShaderParameter("scroll_speed", Vector2.Zero);
     }
 
     public static void RenderWindow(WindowData data)
     {
+        var node = data.Node as WindowDataNode;
+        if (node is null || data.Disposed)
+            return;
+
+        if (data.Windowskin is { Dirty: true })
+            data.Windowskin.UpdateTexture();
+
+        if (data.Contents is { Dirty: true })
+            data.Contents.UpdateTexture();
+
+        var background = GetOrCreateWindowTextureRect(node, "WindowBackground", "res://Shaders/WindowBackgroundShader.gdshader");
+        var tiledBackground = GetOrCreateWindowTextureRect(node, "WindowTiledBackground", "res://Shaders/TiledBackgroundShader.gdshader");
+        var border = GetOrCreateWindowNinePatch(node, "WindowBorder", 16, false);
+        var contents = GetOrCreateWindowContents(node);
+        var cursor = GetOrCreateWindowNinePatch(node, "WindowCursor", 2, true);
+
+        var openness = Math.Clamp(data.Openness / 255.0f, 0.0f, 1.0f);
+        var width = Math.Max(0, data.Width);
+        var height = Math.Max(0, data.Height);
+        var backgroundWidth = Math.Max(0, width - 2);
+        var backgroundHeight = Math.Max(0, height - 2) * openness;
+        var borderHeight = height * openness;
+        var windowOpacity = ToAlpha(data.Opacity);
+        var hasWindowskin = data.Windowskin is { Disposed: false, Texture: not null };
+
+        node.Visible = data.Visible && width > 0 && height > 0 && openness > 0.0f;
+        node.ZIndex = data.Z;
+        node.Position = new Vector2(data.X, -data.Y - height * (1.0f - openness) / 2.0f);
+
+        background.Visible = node.Visible && hasWindowskin;
+        background.Texture = GetAtlasTexture(background.Texture, data.Windowskin, new Rect2(0, 0, 64, 64));
+        background.Position = new Vector2(1.0f, -1.0f - backgroundHeight);
+        background.Size = new Vector2(backgroundWidth, backgroundHeight);
+        background.ZIndex = data.Z;
+        background.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.BackOpacity) * windowOpacity);
+
+        tiledBackground.Visible = node.Visible && hasWindowskin;
+        tiledBackground.Texture = GetAtlasTexture(tiledBackground.Texture, data.Windowskin, new Rect2(0, 64, 64, 64));
+        tiledBackground.Position = background.Position;
+        tiledBackground.Size = background.Size;
+        tiledBackground.ZIndex = data.Z + 1;
+        tiledBackground.Modulate = background.Modulate;
+
+        border.Visible = node.Visible && hasWindowskin;
+        border.Texture = GetAtlasTexture(border.Texture, data.Windowskin, new Rect2(64, 0, 64, 64));
+        border.Position = new Vector2(0.0f, -borderHeight);
+        border.Size = new Vector2(width, borderHeight);
+        border.ZIndex = data.Z + 2;
+        border.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
+
+        var tone = new Vector4(data.Tone?.Red ?? 0.0f, data.Tone?.Green ?? 0.0f, data.Tone?.Blue ?? 0.0f, data.Tone?.Gray ?? 0.0f);
+        if (background.Material is ShaderMaterial backgroundMaterial)
+            backgroundMaterial.SetShaderParameter("tone", tone);
+
+        if (tiledBackground.Material is ShaderMaterial tiledMaterial)
+        {
+            tiledMaterial.SetShaderParameter("tone", tone);
+            tiledMaterial.SetShaderParameter("tile_scale", new Vector2(backgroundWidth / 64.0f, Math.Max(0.0f, height - 2) / 64.0f));
+            tiledMaterial.SetShaderParameter("uv_offset", new Vector2(2.0f / 64.0f, 2.0f / 64.0f));
+            tiledMaterial.SetShaderParameter("scroll_speed", Vector2.Zero);
+        }
+
+        var contentWidth = Math.Max(0, width - data.Padding * 2);
+        var contentHeight = Math.Max(0, height - data.Padding - data.PaddingBottom);
+        var hasContents = data.Contents is { Disposed: false, Texture: not null, Width: > 0, Height: > 0 };
+        contents.Visible = node.Visible && hasContents && data.Openness == 255;
+        contents.Texture = hasContents ? data.Contents!.Texture : null;
+        contents.Position = new Vector2(data.Padding - data.Ox, -data.Padding + data.Oy);
+        contents.ZIndex = data.Z + 3;
+        contents.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.ContentsOpacity) * windowOpacity);
+
+        if (contents.Material is ShaderMaterial contentsMaterial && hasContents)
+        {
+            contentsMaterial.SetShaderParameter(
+                "region",
+                new Vector4(
+                    data.Ox / (float)Math.Max(1, data.Contents!.Width),
+                    data.Oy / (float)Math.Max(1, data.Contents.Height),
+                    Math.Clamp(contentWidth / (float)Math.Max(1, data.Contents.Width), 0.0f, 1.0f),
+                    Math.Clamp(contentHeight / (float)Math.Max(1, data.Contents.Height), 0.0f, 1.0f)));
+        }
+
+        var cursorRect = data.CursorRect;
+        var hasCursor = hasWindowskin && cursorRect is { Width: > 0, Height: > 0 } && data.Openness == 255;
+        cursor.Visible = node.Visible && hasCursor;
+        cursor.Texture = GetAtlasTexture(cursor.Texture, data.Windowskin, new Rect2(64, 64, 32, 32));
+        cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, -cursorRect.Y - data.Padding) : Vector2.Zero;
+        cursor.Size = hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.Zero;
+        cursor.ZIndex = data.Z + 4;
+        // RGSS animates this alpha over time; use a stable active highlight until a frame counter is ported.
+        cursor.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, (data.Active ? 0.5f : 0.25f) * windowOpacity);
+    }
+
+    private static TextureRect GetOrCreatePlaneDrawable(PlaneDataNode node, int blendType)
+    {
+        var drawable = node.GetNodeOrNull<TextureRect>("PlaneDrawable");
+        if (drawable is not null)
+            return drawable;
+
+        drawable = new TextureRect
+        {
+            Name = "PlaneDrawable",
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
+            ZAsRelative = false,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
+            Material = CreatePlaneMaterial(blendType),
+        };
+        // A TextureRect gives the bare PlaneDataNode a viewport-sized quad; PlaneShader handles RGSS tiling via UV fract().
+        node.AddChild(drawable);
+        return drawable;
+    }
+
+    private static TextureRect GetOrCreateWindowTextureRect(WindowDataNode node, string name, string shaderPath)
+    {
+        var textureRect = node.GetNodeOrNull<TextureRect>(name);
+        if (textureRect is not null)
+            return textureRect;
+
+        textureRect = new TextureRect
+        {
+            Name = name,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
+            ZAsRelative = false,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
+        };
+        var shader = GD.Load<Shader>(shaderPath);
+        if (shader is not null)
+            textureRect.Material = new ShaderMaterial { Shader = shader };
+
+        node.AddChild(textureRect);
+        return textureRect;
+    }
+
+    private static NinePatchRect GetOrCreateWindowNinePatch(WindowDataNode node, string name, int margin, bool drawCenter)
+    {
+        var ninePatch = node.GetNodeOrNull<NinePatchRect>(name);
+        if (ninePatch is not null)
+            return ninePatch;
+
+        ninePatch = new NinePatchRect
+        {
+            Name = name,
+            ZAsRelative = false,
+            DrawCenter = drawCenter,
+            PatchMarginLeft = margin,
+            PatchMarginTop = margin,
+            PatchMarginRight = margin,
+            PatchMarginBottom = margin,
+        };
+        node.AddChild(ninePatch);
+        return ninePatch;
+    }
+
+    private static Sprite2D GetOrCreateWindowContents(WindowDataNode node)
+    {
+        var contents = node.GetNodeOrNull<Sprite2D>("WindowContents");
+        if (contents is not null)
+            return contents;
+
+        contents = new Sprite2D
+        {
+            Name = "WindowContents",
+            Centered = false,
+            ZAsRelative = false,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Disabled,
+        };
+        var shader = GD.Load<Shader>("res://Shaders/SpriteMaskShader.gdshader");
+        if (shader is not null)
+            contents.Material = new ShaderMaterial { Shader = shader };
+
+        node.AddChild(contents);
+        return contents;
+    }
+
+    private static Texture2D? GetAtlasTexture(Texture2D? currentTexture, BitmapData? bitmap, Rect2 region)
+    {
+        if (bitmap is not { Disposed: false, Texture: not null })
+            return null;
+
+        if (currentTexture is AtlasTexture atlasTexture && ReferenceEquals(atlasTexture.Atlas, bitmap.Texture) && atlasTexture.Region == region)
+            return atlasTexture;
+
+        return new AtlasTexture
+        {
+            Atlas = bitmap.Texture,
+            Region = region,
+        };
+    }
+
+    private static Vector2 GetNodeRenderSize(Node node)
+    {
+        if (node.GetViewport() is SubViewport subViewport && subViewport.Size.X > 0 && subViewport.Size.Y > 0)
+            return new Vector2(subViewport.Size.X, subViewport.Size.Y);
+
+        return GetRenderSize();
+    }
+
+    private static float ToAlpha(int opacity)
+        => Math.Clamp(opacity / 255.0f, 0.0f, 1.0f);
+
+    private static ShaderMaterial CreatePlaneMaterial(int blendType)
+    {
+        var shader = blendType switch
+        {
+            1 => CreatePlaneShaderVariant("blend_add"),
+            2 => CreatePlaneShaderVariant("blend_sub"),
+            _ => GD.Load<Shader>("res://Shaders/PlaneShader.gdshader"),
+        };
+
+        return new ShaderMaterial
+        {
+            Shader = shader,
+            ResourceName = GetPlaneMaterialName(blendType),
+        };
+    }
+
+    private static string GetPlaneMaterialName(int blendType)
+        => blendType switch
+        {
+            1 => "RgssPlaneBlendAdd",
+            2 => "RgssPlaneBlendSub",
+            _ => "RgssPlaneBlendMix",
+        };
+
+    private static Shader CreatePlaneShaderVariant(string blendMode)
+    {
+        return new Shader
+        {
+            Code = $$"""
+shader_type canvas_item;
+render_mode {{blendMode}}, unshaded;
+
+uniform vec4 mix_color = vec4(0.0, 0.0, 0.0, 0.0);
+uniform vec4 tone = vec4(0.0, 0.0, 0.0, 0.0);
+uniform vec2 tile_scale = vec2(1.0, 1.0);
+uniform vec2 uv_offset = vec2(0.0, 0.0);
+uniform vec2 scroll_speed = vec2(0.0, 0.0);
+
+const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+
+void fragment() {
+    vec2 uv = UV * tile_scale;
+    uv.y -= tile_scale.y - 1.0;
+    uv += vec2(uv_offset.x, -uv_offset.y) + (scroll_speed * TIME);
+    uv = fract(uv);
+
+    vec4 col = texture(TEXTURE, uv);
+
+    float luma = dot(col.rgb, LUMA);
+    col.rgb = mix(col.rgb, vec3(luma), tone.a);
+    col.rgb += tone.rgb;
+    col.rgb = mix(col.rgb, mix_color.rgb, mix_color.a);
+
+    COLOR = col;
+}
+""",
+        };
     }
 
     private static Vector2 GetRenderSize()
