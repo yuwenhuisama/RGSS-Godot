@@ -60,11 +60,11 @@ jobs:
           MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
         run: |
           set -euxo pipefail
-          mkdir -p RGSS-Godot/mruby-ext/{marshal,glob,regexp,zlib}/lib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/marshal/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/glob/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/regexp/lib/libmruby_x64.dylib
-          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/zlib/lib/libmruby_x64.dylib
+          # The 4 gem xmake.lua all link "lib/libmruby_x64.dylib" relative to the
+          # mruby-ext PROJECT ROOT (xmake os.projectdir()), so the host lib goes
+          # in mruby-ext/lib/, NOT each gem's own lib/ subdir.
+          mkdir -p RGSS-Godot/mruby-ext/lib
+          cp mruby-for-dotnet/mruby-shared/build/macosx/universal/release/libmruby_x64.dylib RGSS-Godot/mruby-ext/lib/libmruby_x64.dylib
           cd RGSS-Godot/mruby-ext
           xmake f -m release
           xmake
@@ -243,11 +243,11 @@ jobs:
           MRUBY_DIR: ${{ github.workspace }}/mruby-for-dotnet/mruby
         run: |
           set -euxo pipefail
-          mkdir -p RGSS-Godot/mruby-ext/{marshal,glob,regexp,zlib}/lib
-          cp mruby-for-dotnet/mruby-shared/build/linux/x64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/marshal/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/glob/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/regexp/lib/libmruby_x64.so
-          cp mruby-for-dotnet/mruby-shared/build/linux/x64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/zlib/lib/libmruby_x64.so
+          # The 4 gem xmake.lua all link "lib/libmruby_x64.so" relative to the
+          # mruby-ext PROJECT ROOT (xmake os.projectdir()), so the host lib goes
+          # in mruby-ext/lib/, NOT each gem's own lib/ subdir.
+          mkdir -p RGSS-Godot/mruby-ext/lib
+          cp mruby-for-dotnet/mruby-shared/build/linux/x64/releasedbg/libmruby_x64.so RGSS-Godot/mruby-ext/lib/libmruby_x64.so
           cd RGSS-Godot/mruby-ext
           xmake f -m releasedbg
           xmake
