@@ -193,3 +193,60 @@ module Cache
   end
 end
 
+# ----------------------------------------------------------------------------
+# mruby 3.3.0 do-while back-edge dispatch workaround
+# ----------------------------------------------------------------------------
+# Our host mruby is 3.3.0. It has a VM bug where the receiver register used by
+# the `OP_SEND` at the back-edge condition of a `begin ... end until <recv>.<m>`
+# do-while loop can be stale, so the condition send raises a spurious
+# `NoMethodError` even though the method is defined and resolves fine via a
+# direct call / send / method() / respond_to? on the very same object. (Fixed
+# upstream in mruby 3.4.0 by commit 0337e0e0 / PR #6427 "update `ci` after
+# re-entry to VM"; we cannot bump the native VM yet because MRuby.Library 0.1.8
+# binds the 3.3.0 ABI.)
+#
+# Symptom we hit: selecting "Fight" in battle -> BattleManager.next_command ->
+#   `end until actor.inputable?` raised "undefined method 'inputable?'".
+#
+# Workaround: rewrite the affected stock-RMVA do-while loops in the equivalent
+# `loop do ... break if ...` form, which compiles to a front-tested loop whose
+# condition send reads a fresh receiver register. Semantics are preserved.
+# Receiver is hoisted to a local and nil-guarded (a nil here would have crashed
+# the original `actor.inputable?` too, so this only widens safety).
+module BattleManager
+  def self.next_command
+    loop do
+      if !actor || !actor.next_command
+        @actor_index += 1
+        return false if @actor_index >= $game_party.members.size
+      end
+      cur = actor
+      break if cur && cur.inputable?
+    end
+    return true
+  end
+
+  def self.prior_command
+    loop do
+      if !actor || !actor.prior_command
+        @actor_index -= 1
+        return false if @actor_index < 0
+      end
+      cur = actor
+      break if cur && cur.inputable?
+    end
+    return true
+  end
+end
+
+class Game_Interpreter
+  # Stock: `begin; @index -= 1; end until @list[@index].indent == @indent`
+  # (event command 413 "Repeat Above"). Same do-while-with-condition-send shape;
+  # rewritten defensively for the same mruby 3.3.0 reason.
+  def command_413
+    loop do
+      @index -= 1
+      break if @list[@index].indent == @indent
+    end
+  end
+end
