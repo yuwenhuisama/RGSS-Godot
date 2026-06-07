@@ -62,13 +62,25 @@ public static class Bitmap
     [RbInstanceMethod("dispose")]
     public static RbValue Dispose(RbState state, RbValue self)
     {
-        GetBitmapData(self).ReleaseResources();
+        // Idempotent, like native RGSS3: disposing an already-disposed bitmap is a
+        // no-op rather than an error. Do NOT route through GetBitmapData (it throws
+        // when Disposed). RMVA disposes bitmaps in many paths and is not always guarded
+        // by `disposed?`, so a double dispose must not crash.
+        var data = self.GetRDataObject<BitmapData>();
+        if (!data.Disposed)
+            data.ReleaseResources();
         return state.RbNil;
     }
 
     [RbInstanceMethod("disposed?")]
     public static RbValue Disposed(RbState state, RbValue self)
-        => GetBitmapData(self).Disposed.ToValue(state);
+        // MUST be safe to call on an already-disposed bitmap (do NOT route through
+        // GetBitmapData, which throws when Disposed). RMVA's Cache relies on this:
+        // Window_Base#draw_face does `Cache.face(name)` then `bitmap.dispose`, leaving a
+        // disposed Bitmap in the cache hash; the next Cache.face -> Cache.include? calls
+        // `@cache[key].disposed?` and expects `true` so it can reload the bitmap. If this
+        // raised, the second face draw (e.g. opening the Item sub-menu) would crash.
+        => self.GetRDataObject<BitmapData>().Disposed.ToValue(state);
 
     [RbInstanceMethod("width")]
     public static RbValue Width(RbState state, RbValue self)
