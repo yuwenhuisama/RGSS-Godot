@@ -1,32 +1,16 @@
 ﻿require 'rpg/event.page'
 
-class RPG::Event::Page::Condition
+class RPG::Event::Page::Graphic
   def initialize
-    @switch1_valid = false
-    @switch2_valid = false
-    @variable_valid = false
-    @self_switch_valid = false
-    @item_valid = false
-    @actor_valid = false
-    @switch1_id = 1
-    @switch2_id = 1
-    @variable_id = 1
-    @variable_value = 0
-    @self_switch_ch = 'A'
-    @item_id = 1
-    @actor_id = 1
+    @tile_id = 0
+    @character_name = ''
+    @character_index = 0
+    @direction = 2
+    @pattern = 0
   end
-  attr_accessor :switch1_valid
-  attr_accessor :switch2_valid
-  attr_accessor :variable_valid
-  attr_accessor :self_switch_valid
-  attr_accessor :item_valid
-  attr_accessor :actor_valid
-  attr_accessor :switch1_id
-  attr_accessor :switch2_id
-  attr_accessor :variable_id
-  attr_accessor :variable_value
-  attr_accessor :self_switch_ch
-  attr_accessor :item_id
-  attr_accessor :actor_id
+  attr_accessor :tile_id
+  attr_accessor :character_name
+  attr_accessor :character_index
+  attr_accessor :direction
+  attr_accessor :pattern
 end
