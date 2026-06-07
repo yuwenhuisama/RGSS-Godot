@@ -34,6 +34,10 @@ public class WindowData : RubyData
     public ToneData? Tone;
     public bool Disposed;
 
+    // Per-frame animation clock, advanced by Window#update (once per game frame).
+    // Drives cursor blink and pause-sign animation, mirroring RGSS3 Window#update.
+    public int AnimationTick;
+
     public Node2D? Node;
 
     public WindowData(RbState state) : base(state)

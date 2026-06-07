@@ -11,11 +11,12 @@ public static class Sprite
     public static RbValue NewWithViewport(RbState state, RbValue self, RbValue viewport)
     {
         var viewportData = viewport.GetRDataObject<ViewportData>();
+        var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
         var data = new SpriteData(state)
         {
             Viewport = viewportData,
             SrcRect = new RectData(state),
-            Tone = new ToneData(state),
+            Tone = toneObj.GetRDataObject<ToneData>(),
             Color = new ColorData(state),
         };
 
@@ -24,6 +25,7 @@ public static class Sprite
         var obj = self.ToClass().NewObjectWithRData(data);
         obj["@viewport"] = viewport;
         obj["@bitmap"] = state.RbNil;
+        obj["@tone"] = toneObj;
         return obj;
     }
 
@@ -166,18 +168,28 @@ public static class Sprite
     [RbInstanceMethod("tone")]
     public static RbValue GetTone(RbState state, RbValue self)
     {
-        var tone = self.GetRDataObject<SpriteData>().Tone;
-        return Tone.CreateTone(state,
-            (tone?.Red ?? 0.0f) * 255.0f,
-            (tone?.Green ?? 0.0f) * 255.0f,
-            (tone?.Blue ?? 0.0f) * 255.0f,
-            (tone?.Gray ?? 0.0f) * 255.0f);
+        // Return the stored Tone wrapper so RGSS3 `sprite.tone.set(...)` mutates the
+        // live SpriteData.Tone the renderer reads (e.g. Spriteset map screen tinting).
+        var stored = self["@tone"];
+        if (!stored.IsNil)
+            return stored;
+
+        var data = self.GetRDataObject<SpriteData>();
+        var toneObj = Tone.CreateTone(state,
+            (data.Tone?.Red ?? 0.0f) * 255.0f,
+            (data.Tone?.Green ?? 0.0f) * 255.0f,
+            (data.Tone?.Blue ?? 0.0f) * 255.0f,
+            (data.Tone?.Gray ?? 0.0f) * 255.0f);
+        data.Tone = toneObj.GetRDataObject<ToneData>();
+        self["@tone"] = toneObj;
+        return toneObj;
     }
 
     [RbInstanceMethod("tone=")]
     public static RbValue SetTone(RbState state, RbValue self, RbValue tone)
     {
         self.GetRDataObject<SpriteData>().Tone = tone.GetRDataObject<ToneData>();
+        self["@tone"] = tone;
         return state.RbNil;
     }
 

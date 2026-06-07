@@ -44,7 +44,13 @@ public static class Window
         => self.GetRDataObject<WindowData>().Disposed.ToValue(state);
 
     [RbInstanceMethod("update")]
-    public static RbValue Update(RbState state, RbValue self) => state.RbNil;
+    public static RbValue Update(RbState state, RbValue self)
+    {
+        // RGSS3 Window#update advances the cursor-blink and pause-sign animation,
+        // called once per game frame. We drive both off this per-window tick.
+        self.GetRDataObject<WindowData>().AnimationTick++;
+        return state.RbNil;
+    }
 
     [RbInstanceMethod("open?")]
     public static RbValue Open(RbState state, RbValue self)
@@ -286,24 +292,44 @@ public static class Window
     [RbInstanceMethod("tone")]
     public static RbValue GetTone(RbState state, RbValue self)
     {
-        var tone = self.GetRDataObject<WindowData>().Tone;
-        return Tone.CreateTone(state,
-            (tone?.Red ?? 0.0f) * 255.0f,
-            (tone?.Green ?? 0.0f) * 255.0f,
-            (tone?.Blue ?? 0.0f) * 255.0f,
-            (tone?.Gray ?? 0.0f) * 255.0f);
+        // Return the STORED Tone wrapper so that RGSS3's `self.tone.set(...)`
+        // (in-place mutation via the getter, as Window_Base#update_tone does)
+        // lands on the same ToneData the renderer reads from WindowData.Tone.
+        // Fabricating a fresh Tone here would make those mutations no-ops.
+        var stored = self["@tone"];
+        if (!stored.IsNil)
+            return stored;
+
+        // Defensive fallback: materialise a zero tone, bind it to WindowData, and store it.
+        var data = self.GetRDataObject<WindowData>();
+        var toneObj = Tone.CreateTone(state,
+            (data.Tone?.Red ?? 0.0f) * 255.0f,
+            (data.Tone?.Green ?? 0.0f) * 255.0f,
+            (data.Tone?.Blue ?? 0.0f) * 255.0f,
+            (data.Tone?.Gray ?? 0.0f) * 255.0f);
+        data.Tone = toneObj.GetRDataObject<ToneData>();
+        self["@tone"] = toneObj;
+        return toneObj;
     }
 
     [RbInstanceMethod("tone=")]
     public static RbValue SetTone(RbState state, RbValue self, RbValue tone)
     {
+        // Keep the stored wrapper and WindowData.Tone pointing at the SAME ToneData,
+        // so a later `window.tone.set(...)` mutates the live renderer tone.
         self.GetRDataObject<WindowData>().Tone = tone.IsNil ? null : tone.GetRDataObject<ToneData>();
+        self["@tone"] = tone;
         return state.RbNil;
     }
 
     private static RbValue CreateWindow(RbState state, RbValue self, int x, int y, int width, int height, RbValue viewport, ViewportData viewportData)
     {
         var cursorRect = Rect.CreateRect(state, 0, 0, 0, 0);
+        // Create the tone through the Tone factory so it owns a Ruby wrapper, and bind
+        // WindowData.Tone to that SAME ToneData. The stored @tone ivar (below) and the
+        // renderer-facing WindowData.Tone must reference one instance so in-place
+        // mutation via `window.tone.set(...)` reaches the renderer (RGSS3 semantics).
+        var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
         var data = new WindowData(state)
         {
             X = x,
@@ -312,7 +338,7 @@ public static class Window
             Height = height,
             Viewport = viewportData,
             CursorRect = cursorRect.GetRDataObject<RectData>(),
-            Tone = new ToneData(state),
+            Tone = toneObj.GetRDataObject<ToneData>(),
         };
 
         GameRenderManager.Instance.RegisterWindow(data, viewportData);
@@ -322,6 +348,7 @@ public static class Window
         obj["@contents"] = state.RbNil;
         obj["@windowskin"] = state.RbNil;
         obj["@cursor_rect"] = cursorRect;
+        obj["@tone"] = toneObj;
         return obj;
     }
 

@@ -618,8 +618,102 @@ public sealed class GameRenderManager : IDisposable
         cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, cursorRect.Y + data.Padding) : Vector2.Zero;
         cursor.Size = hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.Zero;
         cursor.ZIndex = data.Z + 4;
-        // RGSS animates this alpha over time; use a stable active highlight until a frame counter is ported.
-        cursor.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, (data.Active ? 0.5f : 0.25f) * windowOpacity);
+        // Cursor blink: RGSS3 oscillates the cursor alpha on a 32-frame triangle wave
+        // (255 down to 128 and back) while the window is active; a dimmed static
+        // highlight when inactive. AnimationTick is advanced by Window#update per frame.
+        var cursorAlpha = GetCursorBlinkAlpha(data.Active, data.AnimationTick);
+        cursor.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, cursorAlpha * windowOpacity);
+
+        RenderWindowPause(node, data, width, height, windowOpacity);
+        RenderWindowArrows(node, data, width, height, contentWidth, contentHeight, windowOpacity);
+    }
+
+    // RGSS3 cursor blink: a 32-frame cycle where alpha ramps 255 -> 128 over the first
+    // 16 frames and back to 255 over the next 16 (a symmetric triangle wave). When the
+    // window is inactive the cursor is shown at a constant dim alpha.
+    private static float GetCursorBlinkAlpha(bool active, int tick)
+    {
+        if (!active)
+            return 128.0f / 255.0f;
+
+        var phase = ((tick % 32) + 32) % 32;     // 0..31, guard against negatives
+        var distance = Math.Abs(phase - 16);     // 16 at phase 0, 0 at phase 16
+        var alpha = 128 + distance * 8;          // 128..256 -> clamp to 255
+        return Math.Min(255, alpha) / 255.0f;
+    }
+
+    // Pause sign: 4 animation frames (16x16) in the windowskin's bottom strip, cycling
+    // ~every 16 game frames. Drawn centred on the window's bottom edge when data.Pause.
+    private static readonly Rect2I[] PauseFrameRects =
+    {
+        new(96, 64, 16, 16),
+        new(112, 64, 16, 16),
+        new(96, 80, 16, 16),
+        new(112, 80, 16, 16),
+    };
+
+    private static void RenderWindowPause(WindowDataNode node, WindowData data, int width, int height, float windowOpacity)
+    {
+        var pause = GetOrCreateWindowSprite(node, "WindowPause");
+        var hasWindowskin = data.Windowskin is { Disposed: false, Texture: not null };
+        var show = node.Visible && data.Pause && hasWindowskin && data.Openness == 255;
+        pause.Visible = show;
+        if (!show)
+            return;
+
+        var frame = (data.AnimationTick / 16) % PauseFrameRects.Length;
+        pause.Texture = GetRegionTexture(data.Windowskin, PauseFrameRects[frame]);
+        // Centred horizontally, sitting on the bottom border (16px tall sign).
+        pause.Position = new Vector2(width / 2.0f - 8.0f, height - 16.0f);
+        pause.ZIndex = data.Z + 5;
+        pause.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
+    }
+
+    // Scroll arrows live in the centre of the windowskin border region (64,0,64,64).
+    // Each is shown only when the contents overflow in that direction and arrows_visible.
+    private static readonly Rect2I ArrowUpRect = new(88, 16, 16, 8);
+    private static readonly Rect2I ArrowDownRect = new(88, 40, 16, 8);
+    private static readonly Rect2I ArrowLeftRect = new(80, 24, 8, 16);
+    private static readonly Rect2I ArrowRightRect = new(104, 24, 8, 16);
+
+    private static void RenderWindowArrows(
+        WindowDataNode node, WindowData data, int width, int height, int contentWidth, int contentHeight, float windowOpacity)
+    {
+        var hasWindowskin = data.Windowskin is { Disposed: false, Texture: not null };
+        var baseVisible = node.Visible && data.ArrowsVisible && hasWindowskin && data.Openness == 255;
+        var contents = data.Contents;
+        var contentsWidth = contents?.Width ?? 0;
+        var contentsHeight = contents?.Height ?? 0;
+
+        // Overflow = the contents bitmap is larger than the visible content area, and the
+        // scroll origin (ox/oy) is not pinned to the corresponding edge.
+        var canUp = baseVisible && data.Oy > 0;
+        var canDown = baseVisible && contentsHeight - data.Oy > contentHeight;
+        var canLeft = baseVisible && data.Ox > 0;
+        var canRight = baseVisible && contentsWidth - data.Ox > contentWidth;
+
+        UpdateArrow(node, "WindowArrowUp", data, ArrowUpRect, canUp,
+            new Vector2(width / 2.0f - 8.0f, 2.0f), windowOpacity);
+        UpdateArrow(node, "WindowArrowDown", data, ArrowDownRect, canDown,
+            new Vector2(width / 2.0f - 8.0f, height - 10.0f), windowOpacity);
+        UpdateArrow(node, "WindowArrowLeft", data, ArrowLeftRect, canLeft,
+            new Vector2(2.0f, height / 2.0f - 8.0f), windowOpacity);
+        UpdateArrow(node, "WindowArrowRight", data, ArrowRightRect, canRight,
+            new Vector2(width - 10.0f, height / 2.0f - 8.0f), windowOpacity);
+    }
+
+    private static void UpdateArrow(
+        WindowDataNode node, string name, WindowData data, Rect2I region, bool show, Vector2 position, float windowOpacity)
+    {
+        var arrow = GetOrCreateWindowSprite(node, name);
+        arrow.Visible = show;
+        if (!show)
+            return;
+
+        arrow.Texture = GetRegionTexture(data.Windowskin, region);
+        arrow.Position = position;
+        arrow.ZIndex = data.Z + 5;
+        arrow.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
     }
 
     private static TextureRect GetOrCreatePlaneDrawable(PlaneDataNode node, int blendType)
@@ -703,6 +797,25 @@ public sealed class GameRenderManager : IDisposable
 
         node.AddChild(contents);
         return contents;
+    }
+
+    // Plain top-left-anchored Sprite2D used for the pause sign and scroll arrows
+    // (small fixed-size windowskin sub-regions, no clipping shader needed).
+    private static Sprite2D GetOrCreateWindowSprite(WindowDataNode node, string name)
+    {
+        var sprite = node.GetNodeOrNull<Sprite2D>(name);
+        if (sprite is not null)
+            return sprite;
+
+        sprite = new Sprite2D
+        {
+            Name = name,
+            Centered = false,
+            ZAsRelative = false,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Disabled,
+        };
+        node.AddChild(sprite);
+        return sprite;
     }
 
     // Godot's AtlasTexture does NOT clip correctly when fed to a NinePatchRect

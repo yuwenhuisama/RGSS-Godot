@@ -105,18 +105,27 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("tone")]
         public static RbValue GetTone(RbState state, RbValue self)
         {
+            // Return the stored Tone wrapper so RGSS3 `viewport.tone.set(...)` (used by
+            // Spriteset map/battle screen tinting) mutates the live ViewportData.Tone.
+            var stored = self["@tone"];
+            if (!stored.IsNil)
+                return stored;
+
             var d = self.GetRDataObject<ViewportData>();
-            return Tone.CreateTone(state,
-                (int)((d.Tone?.Red ?? 0) * 255), (int)((d.Tone?.Green ?? 0) * 255),
-                (int)((d.Tone?.Blue ?? 0) * 255), (int)((d.Tone?.Gray ?? 0) * 255));
+            var toneObj = Tone.CreateTone(state,
+                (d.Tone?.Red ?? 0.0f) * 255.0f, (d.Tone?.Green ?? 0.0f) * 255.0f,
+                (d.Tone?.Blue ?? 0.0f) * 255.0f, (d.Tone?.Gray ?? 0.0f) * 255.0f);
+            d.Tone = toneObj.GetRDataObject<ToneData>();
+            self["@tone"] = toneObj;
+            return toneObj;
         }
 
         [RbInstanceMethod("tone=")]
         public static RbValue SetTone(RbState state, RbValue self, RbValue tone)
         {
             var d = self.GetRDataObject<ViewportData>();
-            var td = tone.GetRDataObject<ToneData>();
-            d.Tone = td;
+            d.Tone = tone.IsNil ? null : tone.GetRDataObject<ToneData>();
+            self["@tone"] = tone;
             return state.RbNil;
         }
 
@@ -165,6 +174,7 @@ namespace RGSSUnity.RubyClasses
         // ── helper ───────────────────────────────────────────────────────────
         private static RbValue CreateViewport(RbState state, int x, int y, int w, int h)
         {
+            var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
             var data = new ViewportData(state)
             {
                 X = x, Y = y,
@@ -172,11 +182,14 @@ namespace RGSSUnity.RubyClasses
                 Height = System.Math.Max(1, h),
                 Z = 0,
                 Visible = true,
+                Tone = toneObj.GetRDataObject<ToneData>(),
             };
             GameRenderManager.Instance.RegisterViewport(data);
 
             var cls = RubyScriptManager.Instance.GetClassUnderUnityModule("Viewport");
-            return cls.NewObjectWithRData(data);
+            var obj = cls.NewObjectWithRData(data);
+            obj["@tone"] = toneObj;
+            return obj;
         }
     }
 }
