@@ -8,7 +8,12 @@ uniform float vague = 0.0001;
 uniform float progress = 0.0;
 
 void fragment() {
-    vec2 uv = UV;
+    // The frozen/new/mask textures are full-screen captures (544x416). Sample them in
+    // SCREEN space, exactly like GraphicsPostprocessShader samples SCREEN_TEXTURE with
+    // SCREEN_UV. Using the ColorRect's local UV instead samples only part of the texture
+    // under the project's "viewport" stretch mode (window override is 2x the viewport),
+    // which made only the top-left quarter of the mask participate.
+    vec2 uv = SCREEN_UV;
 
     float safe_vague = max(vague, 0.0001);
     float trans_v = texture(transition_tex, uv).r;

@@ -33,6 +33,17 @@ public class RubyScriptManager
     [DllImport("libmruby_zlib_ext_x64", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     private static extern void mrb_mruby_zlib_gem_init(IntPtr mrb);
 
+    // Length-aware script loader (exported by the host libmruby_x64). We call this with
+    // explicit UTF-8 bytes instead of MRuby.Library's RbCompiler.LoadString(string),
+    // because that path marshals the C# string to the native side using the platform
+    // ANSI codepage (cp936/GBK on a Chinese Windows). That re-encoded UTF-8 RGSS string
+    // literals (e.g. Vocab messages) into GBK bytes inside mruby, which then rendered as
+    // mojibake when read back as UTF-8. Passing the raw UTF-8 bytes keeps script string
+    // literals as UTF-8 end to end, on every platform/locale.
+    // Signature: mrb_value mrb_load_nstring_cxt(mrb_state*, const char* s, size_t len, mrbc_context*)
+    [DllImport("libmruby_x64", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mrb_load_nstring_cxt")]
+    private static extern ulong mrb_load_nstring_cxt(IntPtr mrb, byte[] s, nuint len, IntPtr cxt);
+
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RubyScriptManager))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RbTypeRegisterHelper))]
     public void Initialize()
@@ -160,7 +171,7 @@ public class RubyScriptManager
         this.compiler!.SetFilename($"{fileName}.rmvascript");
 
         var result = this.State.Protect(
-            (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
+            (_, _, _) => this.LoadUtf8String(scriptContent),
             ref error, out var func);
         GC.KeepAlive(func);
 
@@ -168,6 +179,26 @@ public class RubyScriptManager
             GD.PrintErr($"Error in RMVA script {fileName}: {SafeClassName(result)}");
 
         return result;
+    }
+
+    // Load Ruby source into mruby using its raw UTF-8 bytes, bypassing
+    // RbCompiler.LoadString(string)'s ANSI-codepage marshaling (which corrupted UTF-8
+    // RGSS string literals to GBK on a Chinese Windows locale). NUL-terminate defensively
+    // and pass the byte length so embedded multibyte text is preserved verbatim.
+    private RbValue LoadUtf8String(string scriptContent)
+    {
+        var utf8 = System.Text.Encoding.UTF8.GetBytes(scriptContent);
+        var buffer = new byte[utf8.Length + 1];
+        Array.Copy(utf8, buffer, utf8.Length);
+        buffer[utf8.Length] = 0;
+
+        var raw = mrb_load_nstring_cxt(
+            this.State.NativeHandler,
+            buffer,
+            (nuint)utf8.Length,
+            this.context!.Value.NativeHandler);
+
+        return this.State.PtrToRbValue((IntPtr)raw);
     }
 
     public void Destroy()

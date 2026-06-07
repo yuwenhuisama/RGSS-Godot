@@ -30,6 +30,57 @@ end
 # needed and have been removed to avoid double-yielding (which would halve the frame
 # rate).
 
+# UTF-8-aware per-character text rendering. The embedded mruby host VM is byte-based
+# (no MRB_UTF8_STRING): String#length, #slice, #[], #each_char all operate on BYTES, so
+# Window_Base#draw_text_ex's `text.slice!(0, 1)` would feed a single byte of a multibyte
+# (3-byte UTF-8) CJK character to draw_text, producing mojibake. (Menus look fine because
+# they draw whole strings via draw_text, never slicing per character.) Re-implement the
+# per-character walk by decoding UTF-8 character boundaries from the leading byte via
+# getbyte/byteslice (both confirmed byte-exact on this VM), so each draw_text receives a
+# complete character.
+class Window_Base
+  # Number of bytes in the UTF-8 character whose leading byte is `b`.
+  def __utf8_char_len(b)
+    return 1 if b.nil?
+    if b < 0x80 then 1
+    elsif b < 0xC0 then 1      # stray continuation byte: treat as 1 (defensive)
+    elsif b < 0xE0 then 2
+    elsif b < 0xF0 then 3
+    elsif b < 0xF8 then 4
+    else 1
+    end
+  end
+
+  # Slice and remove the first whole UTF-8 character from `text` (mutating it), returning
+  # that character. Mirrors text.slice!(0, 1) but character- not byte-wise.
+  def __utf8_shift_char!(text)
+    n = __utf8_char_len(text.getbyte(0))
+    ch = text.byteslice(0, n)
+    text.replace(text.byteslice(n, text.bytesize - n) || "")
+    ch
+  end
+
+  def draw_text_ex(x, y, text)
+    reset_font_settings
+    text = convert_escape_characters(text)
+    pos = { :x => x, :y => y, :new_x => x, :height => calc_line_height(text) }
+    process_character(__utf8_shift_char!(text), text, pos) until text.empty?
+  end
+end
+
+# Window_Message has its OWN per-character loop (process_all_text) that does NOT go
+# through draw_text_ex, so it needs the same UTF-8-aware character walk to avoid mojibake
+# on multibyte (CJK) message text.
+class Window_Message
+  def process_all_text
+    open_and_wait
+    text = convert_escape_characters($game_message.all_text)
+    pos = {}
+    new_page(text, pos)
+    process_character(__utf8_shift_char!(text), text, pos) until text.empty?
+  end
+end
+
 module DataManager
   def self.__get_real_path__(*path)
     File.join($rmva_project_base_path, "RMProject", *path)
@@ -141,3 +192,4 @@ module Cache
     end
   end
 end
+
