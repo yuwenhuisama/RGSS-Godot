@@ -14,6 +14,16 @@ config/name="RGSS-Godot"
 run/main_scene="res://Scenes/Boot.tscn"
 config/features=PackedStringArray("4.6", "C#")
 
+[display]
+
+window/size/viewport_width=544
+window/size/viewport_height=416
+window/size/window_width_override=1088
+window/size/window_height_override=832
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+window/stretch/scale_mode="integer"
+
 [dotnet]
 
 project/assembly_name="RGSS-Godot"
@@ -24,6 +34,4 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [rendering]
 
-; Required to export for macOS arm64/universal (Apple Silicon); Godot refuses
-; the universal export preset unless ETC2 ASTC VRAM compression is enabled.
 textures/vram_compression/import_etc2_astc=true

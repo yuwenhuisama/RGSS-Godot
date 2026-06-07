@@ -206,9 +206,11 @@ public sealed class GameRenderManager : IDisposable
         {
             Name = $"ViewportWrapper_{this.viewports.Count}",
             Texture = subViewport.GetTexture(),
+            Centered = false,
+            FlipV = false,
+            Position = Vector2.Zero,
             ZAsRelative = false,
             ZIndex = data.Z,
-            FlipV = true,
         };
         this.renderRoot.AddChild(wrapper);
 
@@ -456,7 +458,7 @@ public sealed class GameRenderManager : IDisposable
         node.Visible = data.Visible && data.Bitmap is { Disposed: false };
         node.Texture = data.Bitmap?.Texture;
         node.ZIndex = data.Z;
-        node.Position = new Vector2(data.X - data.Ox, -data.Y + data.Oy);
+        node.Position = new Vector2(data.X - data.Ox, data.Y - data.Oy);
         node.Scale = new Vector2(data.ZoomX, data.ZoomY);
         node.RotationDegrees = data.Angle;
         node.FlipH = data.Mirror;
@@ -554,11 +556,11 @@ public sealed class GameRenderManager : IDisposable
 
         node.Visible = data.Visible && width > 0 && height > 0 && openness > 0.0f;
         node.ZIndex = data.Z;
-        node.Position = new Vector2(data.X, -data.Y - height * (1.0f - openness) / 2.0f);
+        node.Position = new Vector2(data.X, data.Y + height * (1.0f - openness) / 2.0f);
 
         background.Visible = node.Visible && hasWindowskin;
         background.Texture = GetAtlasTexture(background.Texture, data.Windowskin, new Rect2(0, 0, 64, 64));
-        background.Position = new Vector2(1.0f, -1.0f - backgroundHeight);
+        background.Position = new Vector2(1.0f, 1.0f);
         background.Size = new Vector2(backgroundWidth, backgroundHeight);
         background.ZIndex = data.Z;
         background.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.BackOpacity) * windowOpacity);
@@ -572,7 +574,7 @@ public sealed class GameRenderManager : IDisposable
 
         border.Visible = node.Visible && hasWindowskin;
         border.Texture = GetAtlasTexture(border.Texture, data.Windowskin, new Rect2(64, 0, 64, 64));
-        border.Position = new Vector2(0.0f, -borderHeight);
+        border.Position = new Vector2(0.0f, 0.0f);
         border.Size = new Vector2(width, borderHeight);
         border.ZIndex = data.Z + 2;
         border.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
@@ -594,7 +596,7 @@ public sealed class GameRenderManager : IDisposable
         var hasContents = data.Contents is { Disposed: false, Texture: not null, Width: > 0, Height: > 0 };
         contents.Visible = node.Visible && hasContents && data.Openness == 255;
         contents.Texture = hasContents ? data.Contents!.Texture : null;
-        contents.Position = new Vector2(data.Padding - data.Ox, -data.Padding + data.Oy);
+        contents.Position = new Vector2(data.Padding - data.Ox, data.Padding - data.Oy);
         contents.ZIndex = data.Z + 3;
         contents.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.ContentsOpacity) * windowOpacity);
 
@@ -613,7 +615,7 @@ public sealed class GameRenderManager : IDisposable
         var hasCursor = hasWindowskin && cursorRect is { Width: > 0, Height: > 0 } && data.Openness == 255;
         cursor.Visible = node.Visible && hasCursor;
         cursor.Texture = GetAtlasTexture(cursor.Texture, data.Windowskin, new Rect2(64, 64, 32, 32));
-        cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, -cursorRect.Y - data.Padding) : Vector2.Zero;
+        cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, cursorRect.Y + data.Padding) : Vector2.Zero;
         cursor.Size = hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.Zero;
         cursor.ZIndex = data.Z + 4;
         // RGSS animates this alpha over time; use a stable active highlight until a frame counter is ported.

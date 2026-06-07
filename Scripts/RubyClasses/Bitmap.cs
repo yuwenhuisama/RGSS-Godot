@@ -296,55 +296,157 @@ public static class Bitmap
     {
         var data = GetBitmapData(self);
         var fontData = GetFontData(data);
-        var label = new Label
+        var str = Utf8String(text);
+        if (str.Length == 0)
+            return state.RbNil;
+
+        DrawTextToImage(
+            data.Image,
+            (int)x.ToIntUnchecked(), (int)y.ToIntUnchecked(),
+            Math.Max(0, (int)w.ToIntUnchecked()), Math.Max(0, (int)h.ToIntUnchecked()),
+            str,
+            Math.Max(1, fontData.Size),
+            ToGodotColor(fontData.Color),
+            (int)align.ToIntUnchecked(),
+            fontData.Outline,
+            ToGodotColor(fontData.OutlineColor));
+
+        data.MarkDirty();
+        return state.RbNil;
+    }
+
+    // CPU text rasterization onto a Godot.Image via the TextServer FreeType glyph
+    // cache. Unlike the previous SubViewport+GetImage approach this is fully
+    // headless-safe: TextServer is independent of the (dummy) RenderingServer, so
+    // FontRenderGlyph/FontGetTextureImage operate on real CPU Images even under
+    // --headless. (Source-verified against godot 4.6 text_server_fb.cpp.)
+    private static void DrawTextToImage(Image dest, int x, int y, int w, int h, string text, int fontSize, Godot.Color color, int align, bool outline, Godot.Color outlineColor)
+    {
+        var ts = TextServerManager.GetPrimaryInterface();
+        var font = ThemeDB.Singleton.FallbackFont;
+        if (ts is null || font is null)
+            return;
+
+        var fontRids = font.GetRids();
+        if (fontRids.Count == 0)
+            return;
+
+        foreach (var fr in fontRids)
         {
-            Text = text.ToStringUnchecked() ?? string.Empty,
-            Position = new Vector2((int)x.ToIntUnchecked(), (int)y.ToIntUnchecked()),
-            Size = new Vector2(Math.Max(0, (int)w.ToIntUnchecked()), Math.Max(0, (int)h.ToIntUnchecked())),
-            ClipText = true,
-            HorizontalAlignment = ToHorizontalAlignment((int)align.ToIntUnchecked()),
-            VerticalAlignment = VerticalAlignment.Top,
-            AutowrapMode = TextServer.AutowrapMode.Off,
-            LabelSettings = new LabelSettings
-            {
-                FontSize = Math.Max(1, fontData.Size),
-                FontColor = ToGodotColor(fontData.Color),
-                OutlineSize = fontData.Outline ? 1 : 0,
-                OutlineColor = ToGodotColor(fontData.OutlineColor),
-                ShadowSize = fontData.Shadow ? 1 : 0,
-                ShadowColor = new Godot.Color(0, 0, 0, 0.5f),
-            },
-        };
-
-        var viewport = new SubViewport
-        {
-            Size = new Vector2I(data.Width, data.Height),
-            TransparentBg = true,
-            Disable3D = true,
-            RenderTargetClearMode = SubViewport.ClearMode.Always,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.Once,
-        };
-
-        viewport.AddChild(label);
-
-        var root = (Engine.GetMainLoop() as SceneTree)?.Root;
-        if (root is not null)
-        {
-            root.AddChild(viewport);
-            RenderingServer.ForceDraw(true, 0.0);
-            var textImage = viewport.GetTexture().GetImage();
-            if (textImage is not null && !textImage.IsEmpty())
-            {
-                if (textImage.GetFormat() != Image.Format.Rgba8)
-                    textImage.Convert(Image.Format.Rgba8);
-
-                BlendImage(data.Image, textImage, 0, 0, data.Width, data.Height, 0, 0, 1.0f);
-                data.MarkDirty();
-            }
+            ts.FontSetMultichannelSignedDistanceField(fr, false);
+            ts.FontSetSubpixelPositioning(fr, TextServer.SubpixelPositioning.Disabled);
         }
 
-        viewport.QueueFree();
-        return state.RbNil;
+        var shaped = ts.CreateShapedText();
+        try
+        {
+            ts.ShapedTextAddString(shaped, text, fontRids, fontSize);
+            ts.ShapedTextShape(shaped);
+
+            var textWidth = ts.ShapedTextGetWidth(shaped);
+            var ascent = ts.ShapedTextGetAscent(shaped);
+            var descent = ts.ShapedTextGetDescent(shaped);
+
+            var penX = align switch
+            {
+                1 => x + (w - textWidth) * 0.5,   // center
+                2 => x + w - textWidth,            // right
+                _ => (double)x,                    // left
+            };
+            var baselineY = y + (h + ascent - descent) * 0.5;
+
+            var clip = new Rect2I(x, y, w, h);
+            var glyphs = ts.ShapedTextGetGlyphs(shaped);
+            foreach (var glyph in glyphs)
+            {
+                var glyphFontRid = glyph["font_rid"].AsRid();
+                var glyphFontSize = glyph["font_size"].AsInt32();
+                var glyphIndex = glyph["index"].AsInt32();
+                var offset = glyph["offset"].AsVector2();
+                var advance = glyph["advance"].AsDouble();
+
+                if (glyphFontRid.IsValid && glyphIndex != 0)
+                {
+                    if (outline)
+                        BlitGlyph(dest, ts, glyphFontRid, glyphFontSize, glyphIndex, 1, penX + offset.X, baselineY + offset.Y, clip, outlineColor);
+
+                    BlitGlyph(dest, ts, glyphFontRid, glyphFontSize, glyphIndex, 0, penX + offset.X, baselineY + offset.Y, clip, color);
+                }
+
+                penX += advance;
+            }
+        }
+        finally
+        {
+            ts.FreeRid(shaped);
+        }
+    }
+
+    private static void BlitGlyph(Image dest, TextServer ts, Rid fontRid, int fontSize, int glyphIndex, int outlineWidth, double penX, double penY, Rect2I clip, Godot.Color color)
+    {
+        var sizeVec = new Vector2I(fontSize, outlineWidth);
+        ts.FontRenderGlyph(fontRid, sizeVec, glyphIndex);
+
+        var texIdx = ts.FontGetGlyphTextureIdx(fontRid, sizeVec, glyphIndex);
+        if (texIdx < 0)
+            return;
+
+        var atlas = ts.FontGetTextureImage(fontRid, sizeVec, (int)texIdx);
+        if (atlas is null)
+            return;
+
+        var uvRect = ts.FontGetGlyphUVRect(fontRid, sizeVec, glyphIndex);
+        if (uvRect.Size.X <= 0 || uvRect.Size.Y <= 0)
+            return;
+
+        var bearing = ts.FontGetGlyphOffset(fontRid, sizeVec, glyphIndex);
+        var srcX = (int)uvRect.Position.X;
+        var srcY = (int)uvRect.Position.Y;
+        var gW = (int)uvRect.Size.X;
+        var gH = (int)uvRect.Size.Y;
+        var dstOriginX = (int)Math.Round(penX + bearing.X);
+        var dstOriginY = (int)Math.Round(penY + bearing.Y);
+
+        var atlasW = atlas.GetWidth();
+        var atlasH = atlas.GetHeight();
+        var destW = dest.GetWidth();
+        var destH = dest.GetHeight();
+
+        for (var gy = 0; gy < gH; gy++)
+        {
+            var sy = srcY + gy;
+            var dy = dstOriginY + gy;
+            if (sy < 0 || sy >= atlasH || dy < clip.Position.Y || dy >= clip.Position.Y + clip.Size.Y || dy < 0 || dy >= destH)
+                continue;
+
+            for (var gx = 0; gx < gW; gx++)
+            {
+                var sx = srcX + gx;
+                var dx = dstOriginX + gx;
+                if (sx < 0 || sx >= atlasW || dx < clip.Position.X || dx >= clip.Position.X + clip.Size.X || dx < 0 || dx >= destW)
+                    continue;
+
+                // TextServer glyph atlas is LA8: GetPixel returns (L,L,L,A) where A is coverage.
+                var coverage = atlas.GetPixel(sx, sy).A;
+                if (coverage <= 0.001f)
+                    continue;
+
+                var srcA = coverage * color.A;
+                if (srcA <= 0.0f)
+                    continue;
+
+                var dpx = dest.GetPixel(dx, dy);
+                var outA = srcA + dpx.A * (1.0f - srcA);
+                var blended = outA > 0.0001f
+                    ? new Godot.Color(
+                        (color.R * srcA + dpx.R * dpx.A * (1.0f - srcA)) / outA,
+                        (color.G * srcA + dpx.G * dpx.A * (1.0f - srcA)) / outA,
+                        (color.B * srcA + dpx.B * dpx.A * (1.0f - srcA)) / outA,
+                        outA)
+                    : Colors.Transparent;
+                dest.SetPixel(dx, dy, blended);
+            }
+        }
     }
 
     [RbInstanceMethod("gradient_fill_rect")]
@@ -377,10 +479,23 @@ public static class Bitmap
     public static RbValue TextSize(RbState state, RbValue self, RbValue text)
     {
         var fontData = GetFontData(GetBitmapData(self));
-        var textValue = text.ToStringUnchecked() ?? string.Empty;
+        var textValue = Utf8String(text);
         var width = textValue.Length * Math.Max(1, fontData.Size);
         var height = Math.Max(1, fontData.Size);
         return Rect.CreateRect(state, 0, 0, width, height);
+    }
+
+    // mruby strings are UTF-8 byte buffers; RbValue.ToStringUnchecked decodes them
+    // with the platform ANSI codepage, which corrupts multibyte (e.g. Chinese)
+    // text into mojibake on a non-UTF-8 system locale. Decode the raw bytes as
+    // UTF-8 explicitly so RGSS string literals render correctly.
+    private static string Utf8String(RbValue value)
+    {
+        if (!value.IsString)
+            return string.Empty;
+
+        var bytes = RbHelper.GetRawBytesFromRbStringObject(value);
+        return bytes.Length == 0 ? string.Empty : System.Text.Encoding.UTF8.GetString(bytes);
     }
 
     private static RbValue CreateBitmapObject(RbState state, Image image)
@@ -517,12 +632,4 @@ public static class Bitmap
             left.B + ((right.B - left.B) * t),
             left.A + ((right.A - left.A) * t));
     }
-
-    private static HorizontalAlignment ToHorizontalAlignment(int align)
-        => align switch
-        {
-            1 => HorizontalAlignment.Center,
-            2 => HorizontalAlignment.Right,
-            _ => HorizontalAlignment.Left,
-        };
 }
