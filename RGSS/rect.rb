@@ -77,4 +77,10 @@ class Rect
       @__handler__.send("#{prop}=", value)
     end
   end
+
+  # Short aliases used by some RPG Maker scripts (rect.w / rect.h).
+  alias_method :w, :width
+  alias_method :h, :height
+  alias_method :w=, :width=
+  alias_method :h=, :height=
 end

@@ -5,7 +5,7 @@ using RGSSGodot;
 
 namespace RGSSUnity.RubyClasses
 {
-    internal class TableData : RubyData
+    public class TableData : RubyData
     {
         public int XSize;
         public int YSize;
@@ -39,6 +39,18 @@ namespace RGSSUnity.RubyClasses
             var res = cls.NewObjectWithRData(tableData);
             return res;
         }
+
+        [RbInstanceMethod("xsize")]
+        private static RbValue GetXSize(RbState state, RbValue self)
+            => ((long)self.GetRDataObject<TableData>().XSize).ToValue(state);
+
+        [RbInstanceMethod("ysize")]
+        private static RbValue GetYSize(RbState state, RbValue self)
+            => ((long)self.GetRDataObject<TableData>().YSize).ToValue(state);
+
+        [RbInstanceMethod("zsize")]
+        private static RbValue GetZSize(RbState state, RbValue self)
+            => ((long)self.GetRDataObject<TableData>().ZSize).ToValue(state);
 
         [RbInstanceMethod("resize")]
         private static RbValue Resize(RbState state, RbValue self, RbValue xsize, RbValue ysize, RbValue zsize)

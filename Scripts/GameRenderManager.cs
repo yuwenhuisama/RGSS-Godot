@@ -14,11 +14,13 @@ public sealed class GameRenderManager : IDisposable
     private readonly Dictionary<SpriteData, SpriteDataNode> sprites = new();
     private readonly Dictionary<PlaneData, PlaneDataNode> planes = new();
     private readonly Dictionary<WindowData, WindowDataNode> windows = new();
+    private readonly Dictionary<TilemapData, TilemapDataNode> tilemaps = new();
     private readonly List<ViewportData> sortedViewports = new();
     private readonly List<ViewportData> pendingViewports = new();
     private readonly List<SpriteData> pendingSprites = new();
     private readonly List<PlaneData> pendingPlanes = new();
     private readonly List<WindowData> pendingWindows = new();
+    private readonly List<TilemapData> pendingTilemaps = new();
 
     private CanvasLayer? compositeLayer;
     private Node2D? renderRoot;
@@ -144,6 +146,18 @@ public sealed class GameRenderManager : IDisposable
             }
         }
 
+        if (this.pendingTilemaps.Count > 0 && this.initialized)
+        {
+            var pendingTilemaps = new List<TilemapData>(this.pendingTilemaps);
+            this.pendingTilemaps.Clear();
+
+            foreach (var tilemapData in pendingTilemaps)
+            {
+                if (tilemapData.Viewport is not null)
+                    this.RegisterTilemap(tilemapData, tilemapData.Viewport);
+            }
+        }
+
         this.viewportNodeCreationReady = true;
 
         if (!this.initialized || this.renderRoot is null)
@@ -169,6 +183,8 @@ public sealed class GameRenderManager : IDisposable
                     RenderPlane(planeNode.Data);
                 else if (child is WindowDataNode windowNode)
                     RenderWindow(windowNode.Data);
+                else if (child is TilemapDataNode tilemapNode)
+                    RenderTilemap(tilemapNode.Data);
             }
         }
     }
@@ -252,8 +268,66 @@ public sealed class GameRenderManager : IDisposable
                 this.UnregisterPlane(plane);
         }
 
+        foreach (var tilemap in new List<TilemapData>(this.tilemaps.Keys))
+        {
+            if (ReferenceEquals(tilemap.Viewport, data))
+                this.UnregisterTilemap(tilemap);
+        }
+
+        foreach (var tilemap in new List<TilemapData>(this.pendingTilemaps))
+        {
+            if (ReferenceEquals(tilemap.Viewport, data))
+                this.UnregisterTilemap(tilemap);
+        }
+
         entry.Wrapper.QueueFree();
         entry.SubViewport.QueueFree();
+    }
+
+    public void RegisterTilemap(TilemapData data, ViewportData viewport)
+    {
+        if (data.Disposed)
+            return;
+
+        data.Viewport = viewport;
+
+        if (!this.initialized || !this.viewports.TryGetValue(viewport, out var entry))
+        {
+            if (!this.pendingTilemaps.Contains(data))
+                this.pendingTilemaps.Add(data);
+
+            return;
+        }
+
+        if (this.tilemaps.TryGetValue(data, out var existing))
+        {
+            if (existing.GetParent() != entry.SubViewportRoot)
+                existing.Reparent(entry.SubViewportRoot);
+
+            return;
+        }
+
+        var node = new TilemapDataNode
+        {
+            Name = "RgssTilemap",
+            Data = data,
+            ZAsRelative = false,
+        };
+
+        entry.SubViewportRoot.AddChild(node);
+        data.Node = node;
+        this.tilemaps.Add(data, node);
+    }
+
+    public void UnregisterTilemap(TilemapData data)
+    {
+        this.pendingTilemaps.Remove(data);
+
+        if (!this.tilemaps.Remove(data, out var node))
+            return;
+
+        data.Node = null;
+        node.QueueFree();
     }
 
     public void RegisterSprite(SpriteData data, ViewportData viewport)
@@ -415,11 +489,13 @@ public sealed class GameRenderManager : IDisposable
         this.sprites.Clear();
         this.planes.Clear();
         this.windows.Clear();
+        this.tilemaps.Clear();
         this.sortedViewports.Clear();
         this.pendingViewports.Clear();
         this.pendingSprites.Clear();
         this.pendingPlanes.Clear();
         this.pendingWindows.Clear();
+        this.pendingTilemaps.Clear();
 
         this.postprocessQuad?.QueueFree();
         this.postprocessLayer?.QueueFree();
@@ -858,6 +934,174 @@ public sealed class GameRenderManager : IDisposable
         return GetRenderSize();
     }
 
+    // One margin tile around the visible area so partial tiles at edges are drawn.
+    private const int TilemapMargin = 1;
+
+    // RGSS3 autotile animation: A-type ping-pongs 0,1,2,1; C-type (waterfall) cycles
+    // 0,1,2; both advance one phase every 30 frames over a 360-frame loop.
+    private static readonly int[] AnimIndicesA = { 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1 };
+    private static readonly int[] AnimIndicesC = { 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };
+
+    public static void RenderTilemap(TilemapData data)
+    {
+        var node = data.Node as TilemapDataNode;
+        if (node is null || data.Disposed)
+            return;
+
+        // Flush any dirty tileset bitmaps so their CPU Images are current before sampling.
+        foreach (var bmp in data.Bitmaps)
+        {
+            if (bmp is { Dirty: true })
+                bmp.UpdateTexture();
+        }
+
+        var ground = GetOrCreateTilemapLayer(node, "TilemapGround", 0);
+        var over = GetOrCreateTilemapLayer(node, "TilemapOver", 200);
+
+        node.ZIndex = 0;
+        node.Visible = data.Visible;
+        if (!data.Visible || data.MapData is null)
+        {
+            ground.Visible = false;
+            over.Visible = false;
+            return;
+        }
+
+        var viewportSize = GetNodeRenderSize(node);
+        var tilesW = (int)Math.Ceiling(viewportSize.X / TilemapRenderer.TileSize) + TilemapMargin * 2;
+        var tilesH = (int)Math.Ceiling(viewportSize.Y / TilemapRenderer.TileSize) + TilemapMargin * 2;
+
+        // Chunk origin: the top-left tile baked into the layer images.
+        var originTileX = (int)Math.Floor(data.Ox / TilemapRenderer.TileSize) - TilemapMargin;
+        var originTileY = (int)Math.Floor(data.Oy / TilemapRenderer.TileSize) - TilemapMargin;
+
+        var animA = AnimIndicesA[(data.AnimationTick / 30) % AnimIndicesA.Length];
+        var animC = AnimIndicesC[(data.AnimationTick / 30) % AnimIndicesC.Length];
+        var mapId = (ulong)data.MapData.GetHashCode();
+
+        // Recomposite only when the visible chunk, map, flags, or animation phase changes.
+        var needComposite = data.LayersDirty
+            || data.CachedOriginTileX != originTileX
+            || data.CachedOriginTileY != originTileY
+            || data.CachedAnimFrameA != animA
+            || data.CachedAnimFrameC != animC
+            || data.CachedMapDataId != mapId;
+
+        if (needComposite)
+        {
+            CompositeTilemap(data, ground, over, originTileX, originTileY, tilesW, tilesH, animA, animC);
+            data.CachedOriginTileX = originTileX;
+            data.CachedOriginTileY = originTileY;
+            data.CachedAnimFrameA = animA;
+            data.CachedAnimFrameC = animC;
+            data.CachedMapDataId = mapId;
+            data.LayersDirty = false;
+        }
+
+        // Sub-tile scroll: position the baked chunk so it tracks ox/oy smoothly.
+        var posX = originTileX * TilemapRenderer.TileSize - data.Ox;
+        var posY = originTileY * TilemapRenderer.TileSize - data.Oy;
+        ground.Position = new Vector2(posX, posY);
+        over.Position = new Vector2(posX, posY);
+        ground.Visible = true;
+        over.Visible = true;
+    }
+
+    private static void CompositeTilemap(
+        TilemapData data, Sprite2D ground, Sprite2D over,
+        int originTileX, int originTileY, int tilesW, int tilesH, int animA, int animC)
+    {
+        var map = data.MapData!;
+        var pixelW = tilesW * TilemapRenderer.TileSize;
+        var pixelH = tilesH * TilemapRenderer.TileSize;
+
+        var groundImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
+        var overImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
+        groundImg.Fill(Colors.Transparent);
+        overImg.Fill(Colors.Transparent);
+
+        var mapW = map.XSize;
+        var mapH = map.YSize;
+        var layers = Math.Min(3, map.ZSize);   // render tile layers z=0,1,2 only
+
+        for (var ty = 0; ty < tilesH; ty++)
+        {
+            var my = originTileY + ty;
+            if (my < 0 || my >= mapH)
+                continue;
+            for (var tx = 0; tx < tilesW; tx++)
+            {
+                var mx = originTileX + tx;
+                if (mx < 0 || mx >= mapW)
+                    continue;
+
+                var px = tx * TilemapRenderer.TileSize;
+                var py = ty * TilemapRenderer.TileSize;
+
+                for (var z = 0; z < layers; z++)
+                {
+                    var tileId = GetMapTile(map, mx, my, z);
+                    if (tileId <= 0)
+                        continue;
+
+                    var overPlayer = (GetTileFlag(data.Flags, tileId) & TilemapRenderer.OverPlayerFlag) != 0;
+                    var target = overPlayer ? overImg : groundImg;
+                    TilemapRenderer.DrawTile(target, px, py, tileId, data.Bitmaps, animA, animC);
+                }
+            }
+        }
+
+        ApplyLayerImage(ground, groundImg);
+        ApplyLayerImage(over, overImg);
+    }
+
+    private static int GetMapTile(TableData map, int x, int y, int z)
+    {
+        var index = x + y * map.XSize + z * map.XSize * map.YSize;
+        if (index < 0 || index >= map.Data.Length)
+            return 0;
+        return map.Data[index];
+    }
+
+    private static int GetTileFlag(TableData? flags, int tileId)
+    {
+        if (flags is null || tileId < 0 || tileId >= flags.Data.Length)
+            return 0;
+        return flags.Data[tileId];
+    }
+
+    private static void ApplyLayerImage(Sprite2D sprite, Image img)
+    {
+        if (sprite.Texture is ImageTexture tex
+            && tex.GetWidth() == img.GetWidth() && tex.GetHeight() == img.GetHeight())
+        {
+            tex.Update(img);
+        }
+        else
+        {
+            sprite.Texture = ImageTexture.CreateFromImage(img);
+        }
+    }
+
+    private static Sprite2D GetOrCreateTilemapLayer(TilemapDataNode node, string name, int zIndex)
+    {
+        var layer = node.GetNodeOrNull<Sprite2D>(name);
+        if (layer is not null)
+            return layer;
+
+        layer = new Sprite2D
+        {
+            Name = name,
+            Centered = false,
+            ZAsRelative = false,
+            ZIndex = zIndex,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Disabled,
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+        };
+        node.AddChild(layer);
+        return layer;
+    }
+
     private static float ToAlpha(int opacity)
         => Math.Clamp(opacity / 255.0f, 0.0f, 1.0f);
 
@@ -973,4 +1217,9 @@ public partial class PlaneDataNode : Node2D
 public partial class WindowDataNode : Node2D
 {
     public WindowData Data { get; set; } = null!;
+}
+
+public partial class TilemapDataNode : Node2D
+{
+    public TilemapData Data { get; set; } = null!;
 }

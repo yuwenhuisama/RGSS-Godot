@@ -31,6 +31,11 @@ class Tone
       check_arguments(args, [Tone])
       tone, = args
       self.set(tone.red, tone.green, tone.blue, tone.gray)
+    elsif args.size == 3
+      check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
+
+      r, g, b = args
+      @__handler__.set_rgbg(r, g, b, 0)
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 

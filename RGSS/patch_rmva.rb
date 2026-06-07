@@ -161,6 +161,11 @@ module Cache
     alias :old_load_bitmap :load_bitmap
 
     def load_bitmap(folder_name, filename, hue = 0)
+      # Empty tileset slots (e.g. a dungeon set with no A3/D/E) pass an empty name.
+      # RGSS3 returns a blank bitmap for these rather than attempting a file load.
+      if filename.nil? || filename.empty?
+        return Bitmap.new(32, 32)
+      end
       unless filename.include?('.')
         filename = filename + ".png"
       end

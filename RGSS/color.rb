@@ -32,6 +32,11 @@ class Color
       color, = args
 
       @__handler__.set_rgba(color.red, color.green, color.blue, color.alpha)
+    elsif args.size == 3
+      check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
+
+      r, g, b = args
+      @__handler__.set_rgba(r, g, b, 255)
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 

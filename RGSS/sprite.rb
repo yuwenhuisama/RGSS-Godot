@@ -28,7 +28,8 @@ class Sprite
   end
 
   def bitmap
-    Bitmap.new @__handler__.bitmap
+    handler = @__handler__.bitmap
+    handler.nil? ? nil : Bitmap.new(handler)
   end
 
   def bitmap=(bitmap)

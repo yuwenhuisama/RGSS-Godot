@@ -18,7 +18,8 @@ class Plane
   [:dispose, :disposed?].each { |method_name| define_method(method_name) { @__handler__.send(method_name) } }
 
   def bitmap
-    Bitmap.new @__handler__.bitmap
+    handler = @__handler__.bitmap
+    handler.nil? ? nil : Bitmap.new(handler)
   end
 
   def bitmap=(value)
