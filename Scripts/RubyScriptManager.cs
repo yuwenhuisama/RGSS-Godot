@@ -33,17 +33,6 @@ public class RubyScriptManager
     [DllImport("libmruby_zlib_ext_x64", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     private static extern void mrb_mruby_zlib_gem_init(IntPtr mrb);
 
-    // Script loader exported by the host libmruby_x64. We declare our own P/Invoke (rather
-    // than using MRuby.Library's RbCompiler.LoadString) ONLY to control the string
-    // marshaling: LPUTF8Str encodes the C# string to the native side as UTF-8. The
-    // library's binding marshals as the platform ANSI codepage (cp936/GBK on a Chinese
-    // Windows locale), which re-encoded UTF-8 RGSS string literals (e.g. Vocab messages)
-    // into GBK bytes inside mruby; reading them back as UTF-8 then produced mojibake.
-    // UTF-8 marshaling keeps script string literals as UTF-8 end to end, on every locale.
-    // Signature: mrb_value mrb_load_string_cxt(mrb_state*, const char* s, mrbc_context*)
-    [DllImport("libmruby_x64", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mrb_load_string_cxt")]
-    private static extern ulong mrb_load_string_cxt(IntPtr mrb, [MarshalAs(UnmanagedType.LPUTF8Str)] string s, IntPtr cxt);
-
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RubyScriptManager))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RbTypeRegisterHelper))]
     public void Initialize()
@@ -170,8 +159,12 @@ public class RubyScriptManager
         this.context!.Value.SetFilename($"{fileName}.rmvascript");
         this.compiler!.SetFilename($"{fileName}.rmvascript");
 
+        // MRuby.Library >= 0.1.8 marshals the script string to the native loader as UTF-8
+        // (LPUTF8Str). Earlier versions used the platform ANSI codepage (cp936/GBK on a
+        // Chinese Windows locale), which re-encoded UTF-8 RGSS string literals to GBK
+        // inside mruby and rendered them as mojibake. Keep the package at >= 0.1.8.
         var result = this.State.Protect(
-            (_, _, _) => this.LoadUtf8String(scriptContent),
+            (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
             ref error, out var func);
         GC.KeepAlive(func);
 
@@ -179,19 +172,6 @@ public class RubyScriptManager
             GD.PrintErr($"Error in RMVA script {fileName}: {SafeClassName(result)}");
 
         return result;
-    }
-
-    // Load Ruby source into mruby with UTF-8 string marshaling (see mrb_load_string_cxt),
-    // bypassing RbCompiler.LoadString(string)'s ANSI-codepage marshaling which corrupted
-    // UTF-8 RGSS string literals to GBK on a Chinese Windows locale.
-    private RbValue LoadUtf8String(string scriptContent)
-    {
-        var raw = mrb_load_string_cxt(
-            this.State.NativeHandler,
-            scriptContent,
-            this.context!.Value.NativeHandler);
-
-        return this.State.PtrToRbValue((IntPtr)raw);
     }
 
     public void Destroy()
