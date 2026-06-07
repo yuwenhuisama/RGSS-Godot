@@ -12,7 +12,6 @@ public static class Graphics
     public static bool Freezing { get; private set; }
 
     private static long frameCount;
-    private static float brightness = 1.0f;
 
     public static void Render()
     {
@@ -68,31 +67,30 @@ public static class Graphics
 
     [RbModuleMethod("brightness")]
     private static RbValue GetBrightness(RbState state, RbValue self)
-        => ((long)Math.Clamp((int)MathF.Round(brightness * 255.0f), 0, 255)).ToValue(state);
+        => ((long)Math.Clamp((int)MathF.Round(GameRenderManager.Instance.GetGraphicsBrightness() * 255.0f), 0, 255)).ToValue(state);
 
     [RbModuleMethod("brightness=")]
     private static RbValue SetBrightness(RbState state, RbValue self, RbValue value)
     {
-        brightness = Math.Clamp((int)value.ToIntUnchecked(), 0, 255) / 255.0f;
-        GameRenderManager.Instance.SetGraphicsBrightness(brightness);
+        GameRenderManager.Instance.SetGraphicsBrightnessImmediate(Math.Clamp((int)value.ToIntUnchecked(), 0, 255) / 255.0f);
         return state.RbNil;
     }
 
     [RbModuleMethod("fadeout")]
     private static RbValue FadeOut(RbState state, RbValue self, RbValue duration)
     {
-        brightness = 0.0f;
-        GameRenderManager.Instance.SetGraphicsBrightness(brightness);
-        WaitCount = Math.Max(0, (int)duration.ToIntUnchecked());
+        int frames = Math.Max(0, (int)duration.ToIntUnchecked());
+        GameRenderManager.Instance.StartBrightnessFade(0.0f, frames);
+        WaitCount = frames;
         return state.RbNil;
     }
 
     [RbModuleMethod("fadein")]
     private static RbValue FadeIn(RbState state, RbValue self, RbValue duration)
     {
-        brightness = 1.0f;
-        GameRenderManager.Instance.SetGraphicsBrightness(brightness);
-        WaitCount = Math.Max(0, (int)duration.ToIntUnchecked());
+        int frames = Math.Max(0, (int)duration.ToIntUnchecked());
+        GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+        WaitCount = frames;
         return state.RbNil;
     }
 
@@ -106,10 +104,15 @@ public static class Graphics
     [RbModuleMethod("transition")]
     private static RbValue Transition(RbState state, RbValue self, RbValue duration, RbValue filename, RbValue vague)
     {
+        // Phase 1: brightness-ramp transition. After a preceding fadeout the screen is
+        // black (brightness 0) and the new scene is already built, so ramping 0->1 fades
+        // the new scene in from black. With no preceding fadeout (brightness already 1)
+        // this is an instant no-op, preserving current behavior for same-brightness
+        // (e.g. menu) changes. `filename`/`vague` (masked crossfade) are Phase 2.
         Freezing = false;
-        brightness = 1.0f;
-        GameRenderManager.Instance.SetGraphicsBrightness(brightness);
-        WaitCount = Math.Max(0, (int)duration.ToIntUnchecked());
+        int frames = Math.Max(0, (int)duration.ToIntUnchecked());
+        GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+        WaitCount = frames;
         return state.RbNil;
     }
 

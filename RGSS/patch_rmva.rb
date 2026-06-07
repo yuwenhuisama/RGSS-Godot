@@ -45,6 +45,22 @@ class Scene_Title
   end
 end
 
+# Scene_Map drives its fade-in/out through fade_loop -> update_for_fade, which in
+# stock RGSS3 calls Graphics.update once per step (each Graphics.update is one frame
+# in the native runtime). In this port Graphics.update does NOT advance the frame /
+# yield the scene fiber, so without an explicit yield every fade_loop iteration runs
+# inside a single engine frame and the fade (e.g. New Game: black -> map) collapses
+# into one instant jump. Re-yield the fiber after each fade step so the brightness
+# ramp spreads across frames, mirroring the __yield_update pattern above.
+class Scene_Map
+  alias :old_update_for_fade :update_for_fade
+
+  def update_for_fade
+    old_update_for_fade
+    Fiber.yield
+  end
+end
+
 class Scene_End
   def close_command_window
     @command_window.close

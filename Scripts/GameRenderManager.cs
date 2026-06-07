@@ -30,6 +30,12 @@ public sealed class GameRenderManager : IDisposable
     private Node? parent;
     private ShaderMaterial? spriteMaterial;
     private ShaderMaterial? postprocessMaterial;
+    private float graphicsBrightness = 1.0f;
+    private bool brightnessFadeActive;
+    private float fadeStartBrightness = 1.0f;
+    private float fadeTargetBrightness = 1.0f;
+    private int fadeTotalFrames;
+    private int fadeFramesElapsed;
     private bool initialized;
     private bool viewportNodeCreationReady;
 
@@ -99,6 +105,7 @@ public sealed class GameRenderManager : IDisposable
 
     public void Update()
     {
+        this.TickBrightnessFade();
         ResetDirtyDataSet();
 
         if (this.pendingViewports.Count > 0 && this.initialized && this.renderRoot is not null)
@@ -1232,9 +1239,66 @@ void fragment() {
         return DisplayServer.WindowGetSize();
     }
 
-    public void SetGraphicsBrightness(float brightness)
+    public float GetGraphicsBrightness() => this.graphicsBrightness;
+
+    // Immediate, cancels any active fade. Used by Graphics.brightness=.
+    public void SetGraphicsBrightnessImmediate(float brightness)
+    {
+        this.brightnessFadeActive = false;
+        this.graphicsBrightness = Math.Clamp(brightness, 0.0f, 1.0f);
+        this.ApplyGraphicsBrightness(this.graphicsBrightness);
+    }
+
+    // Begin a linear brightness ramp from the current value to `target` over `durationFrames`
+    // engine frames, driven by Update(). durationFrames<=0 applies immediately.
+    public void StartBrightnessFade(float target, int durationFrames)
+    {
+        target = Math.Clamp(target, 0.0f, 1.0f);
+
+        if (durationFrames <= 0)
+        {
+            this.SetGraphicsBrightnessImmediate(target);
+            return;
+        }
+
+        this.fadeStartBrightness = this.graphicsBrightness;
+        this.fadeTargetBrightness = target;
+        this.fadeTotalFrames = durationFrames;
+        this.fadeFramesElapsed = 0;
+        this.brightnessFadeActive = true;
+
+        // Do NOT jump on the call frame; hold current brightness. The ramp advances
+        // starting next frame in Update().
+        this.ApplyGraphicsBrightness(this.graphicsBrightness);
+    }
+
+    private void ApplyGraphicsBrightness(float brightness)
     {
         this.postprocessMaterial?.SetShaderParameter("brightness", Math.Clamp(brightness, 0.0f, 1.0f));
+    }
+
+    // Advances the brightness ramp by one frame. Increment-first so that on frame
+    // `fadeTotalFrames` the value reaches EXACTLY the target. Called once per engine
+    // frame from Update(), including while the Ruby fiber is parked (WaitCount>0).
+    private void TickBrightnessFade()
+    {
+        if (!this.brightnessFadeActive)
+            return;
+
+        this.fadeFramesElapsed++;
+        float t = (float)this.fadeFramesElapsed / this.fadeTotalFrames;
+
+        if (t >= 1.0f)
+        {
+            this.graphicsBrightness = this.fadeTargetBrightness;
+            this.brightnessFadeActive = false;
+        }
+        else
+        {
+            this.graphicsBrightness = Mathf.Lerp(this.fadeStartBrightness, this.fadeTargetBrightness, t);
+        }
+
+        this.ApplyGraphicsBrightness(this.graphicsBrightness);
     }
 
     private static Vector4 BuildFlashVector(SpriteData data)

@@ -6,6 +6,5 @@ uniform float brightness = 0.0;
 
 void fragment() {
     vec4 col = textureLod(SCREEN_TEXTURE, SCREEN_UV, 0.0);
-    col -= vec4(1.0 - brightness);
-    COLOR = col;
+    COLOR = vec4(col.rgb * brightness, 1.0);
 }
