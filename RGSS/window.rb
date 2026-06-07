@@ -11,8 +11,8 @@ class Window
     @__handler__ = Unity::Window.new_xywh(x, y, width, height, Viewport::DEFAULT_VIEWPORT.__handler__)
     self.cursor_rect = Rect.create_default_rect
     self.contents = Bitmap.create_default_bitmap
-    self.padding = 24
-    self.padding_bottom = 24
+    self.padding = 12
+    self.padding_bottom = 12
   end
 
   def move(x, y, w, h)

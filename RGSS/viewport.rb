@@ -22,12 +22,21 @@ class Viewport
   end
 
   def flash(color, duration)
-    check_arguments([color, duration], [Color, [Integer, NilClass]])
+    check_arguments([color, duration], [[Color, NilClass], Integer])
     if color.nil?
       @__handler__.flash(nil, duration)
     else
       @__handler__.flash(color.__handler__, duration)
     end
+  end
+
+  def visible
+    @__handler__.visible
+  end
+
+  def visible=(value)
+    check_type(value, [TrueClass, FalseClass])
+    @__handler__.visible = value
   end
 
   [:dispose, :disposed?, :update].each do |method|

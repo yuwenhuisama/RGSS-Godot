@@ -89,9 +89,8 @@ namespace RGSSUnity.RubyClasses
         {
             var tableData = self.GetRDataObject<TableData>();
             var unboxedX = (int)x.ToIntUnchecked();
-            if (unboxedX > tableData.XSize)
+            if (unboxedX < 0 || unboxedX >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
             var data = tableData.Data[unboxedX];
@@ -105,9 +104,8 @@ namespace RGSSUnity.RubyClasses
             var unboxedX = (int)x.ToIntUnchecked();
             var unboxedY = (int)y.ToIntUnchecked();
             var index = unboxedX + unboxedY * tableData.XSize;
-            if (index > tableData.Data.Length)
+            if (index < 0 || index >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
 
@@ -125,9 +123,8 @@ namespace RGSSUnity.RubyClasses
 
             var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
 
-            if (index > tableData.Data.Length)
+            if (index < 0 || index >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
 
@@ -140,13 +137,11 @@ namespace RGSSUnity.RubyClasses
         {
             var tableData = self.GetRDataObject<TableData>();
             var unboxedX = (int)x.ToIntUnchecked();
-            if (unboxedX > tableData.XSize)
+            if (unboxedX < 0 || unboxedX >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
-            var unboxedValue = value.ToIntUnchecked();
-            tableData.Data[unboxedX] = (int)unboxedValue;
+            tableData.Data[unboxedX] = (short)(long)value.ToIntUnchecked();
             return state.RbNil;
         }
 
@@ -157,13 +152,11 @@ namespace RGSSUnity.RubyClasses
             var unboxedX = (int)x.ToIntUnchecked();
             var unboxedY = (int)y.ToIntUnchecked();
             var index = unboxedX + unboxedY * tableData.XSize;
-            if (index > tableData.Data.Length)
+            if (index < 0 || index >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
-            var unboxedValue = value.ToIntUnchecked();
-            tableData.Data[index] = (int)unboxedValue;
+            tableData.Data[index] = (short)(long)value.ToIntUnchecked();
             return state.RbNil;
         }
 
@@ -175,13 +168,11 @@ namespace RGSSUnity.RubyClasses
             var unboxedY = (int)y.ToIntUnchecked();
             var unboxedZ = (int)z.ToIntUnchecked();
             var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
-            if (index > tableData.Data.Length)
+            if (index < 0 || index >= tableData.Data.Length)
             {
-                state.RaiseRGSSError("Index out of bounds");
                 return state.RbNil;
             }
-            var unboxedValue = value.ToIntUnchecked();
-            tableData.Data[index] = (int)unboxedValue;
+            tableData.Data[index] = (short)(long)value.ToIntUnchecked();
             return state.RbNil;
         }
 

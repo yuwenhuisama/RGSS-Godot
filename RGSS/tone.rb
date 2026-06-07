@@ -35,12 +35,12 @@ class Tone
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
 
       r, g, b = args
-      @__handler__.set_rgbg(r, g, b, 0)
+      @__handler__.set_rgbg(r.clamp(-255, 255), g.clamp(-255, 255), b.clamp(-255, 255), 0)
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 
       r, g, b, gray = args
-      @__handler__.set_rgbg(r, g, b, gray)
+      @__handler__.set_rgbg(r.clamp(-255, 255), g.clamp(-255, 255), b.clamp(-255, 255), gray.clamp(0, 255))
     else
       raise ArgumentError.new("Invalid number of arguments")
     end
@@ -74,7 +74,9 @@ class Tone
     define_method(prop) { @__handler__.send(prop) }
     define_method("#{prop}=") do |value|
       check_type(value, [Integer, Float])
-      @__handler__.send("#{prop}=", value)
+      # RGSS3 clamps tone components: red/green/blue to -255..255, gray to 0..255.
+      v = prop == :gray ? value.clamp(0, 255) : value.clamp(-255, 255)
+      @__handler__.send("#{prop}=", v)
     end
   end
 end

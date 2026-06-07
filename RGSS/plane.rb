@@ -23,8 +23,8 @@ class Plane
   end
 
   def bitmap=(value)
-    check_type(value, Bitmap)
-    @__handler__.bitmap = value.__handler__
+    check_type(value, [Bitmap, NilClass])
+    @__handler__.bitmap = value&.__handler__
   end
 
   def viewport
@@ -35,8 +35,8 @@ class Plane
   end
 
   def viewport=(value)
-    check_type(value, Viewport)
-    @__handler__.viewport = value.__handler__
+    check_type(value, [Viewport, NilClass])
+    @__handler__.viewport = (value || Viewport::DEFAULT_VIEWPORT).__handler__
   end
 
   def color
@@ -69,6 +69,7 @@ class Plane
   end
 
   TYPE_CHECK_MAP = {
+    :visible => [TrueClass, FalseClass],
     :z => Integer,
     :ox => [Integer, Float],
     :oy => [Integer, Float],

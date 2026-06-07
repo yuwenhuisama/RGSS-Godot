@@ -207,6 +207,18 @@ jobs:
             echo "ASSERT:NO_GEM_INIT_FAIL"
           } > evidence/t27-macos-ci.txt
 
+      - name: Run RGSS API unit tests
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -o pipefail
+          export DYLD_LIBRARY_PATH="$PWD/Plugins/macos${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+          # Self-asserting Ruby API tests driven through the mruby VM (no game data
+          # needed). Runner exits 0 on all-pass and prints RGSS_API_TESTS_PASS.
+          "$GODOT_BIN" --headless --path . -s res://tests/test_rgss_api.gd 2>&1 | tee evidence/api-tests-macos.log || true
+          grep -q "RGSS_API_TESTS_PASS" evidence/api-tests-macos.log
+          ! grep -q "RGSS_API_TESTS_FAIL" evidence/api-tests-macos.log
+
       - name: Upload macOS evidence
         uses: actions/upload-artifact@v6
         with:
@@ -366,6 +378,18 @@ jobs:
             echo "ASSERT:NO_GEM_INIT_FAIL (engine boot health; main loop needs game data not shipped in CI)"
             echo "ASSERT:NO_GEM_INIT_FAIL"
           } > evidence/t28-linux-ci.txt
+
+      - name: Run RGSS API unit tests
+        shell: bash
+        working-directory: RGSS-Godot
+        run: |
+          set -o pipefail
+          export LD_LIBRARY_PATH="$PWD/Plugins/linux${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          # Self-asserting Ruby API tests driven through the mruby VM (no game data
+          # needed). Runner exits 0 on all-pass and prints RGSS_API_TESTS_PASS.
+          "$GODOT_BIN" --headless --path . -s res://tests/test_rgss_api.gd 2>&1 | tee evidence/api-tests-linux.log || true
+          grep -q "RGSS_API_TESTS_PASS" evidence/api-tests-linux.log
+          ! grep -q "RGSS_API_TESTS_FAIL" evidence/api-tests-linux.log
 
       - name: Upload Linux evidence
         uses: actions/upload-artifact@v6

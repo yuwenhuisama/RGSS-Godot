@@ -71,7 +71,7 @@ class Table
     for z in 0...self.zsize
       for y in 0...self.ysize
         for x in 0...self.xsize
-          s += [self[x + y * self.xsize + z * self.xsize * self.ysize]].pack('S')
+          s += [self[x, y, z]].pack('S')
         end
       end
     end

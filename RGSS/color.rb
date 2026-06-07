@@ -36,12 +36,12 @@ class Color
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
 
       r, g, b = args
-      @__handler__.set_rgba(r, g, b, 255)
+      @__handler__.set_rgba(r.clamp(0, 255), g.clamp(0, 255), b.clamp(0, 255), 255)
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 
       r, g, b, a = args
-      @__handler__.set_rgba(r, g, b, a)
+      @__handler__.set_rgba(r.clamp(0, 255), g.clamp(0, 255), b.clamp(0, 255), a.clamp(0, 255))
     else
       raise ArgumentError.new("Invalid number of arguments")
     end
@@ -86,5 +86,5 @@ class Color
   GREEN = Color.new(0, 255, 0, 255)
   BLUE = Color.new(0, 0, 255, 255)
   WHITE = Color.new(255, 255, 255, 255)
-  BLACK = Color.new(255, 255, 255, 255)
+  BLACK = Color.new(0, 0, 0, 255)
 end

@@ -71,11 +71,14 @@ namespace RGSSUnity.RubyClasses
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var aVal = a.IsInt ? a.ToIntUnchecked() : a.ToFloatUnchecked();
 
+            // Stored normalized 0..1 (consumed as a Godot Color). MUST divide by 255 to
+            // match the constructor (CreateColor) and the per-component setters; storing
+            // raw 0..255 here made every color.set(...) render 255x too bright.
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.R = (float)rVal;
-            colorData.G = (float)gVal;
-            colorData.B = (float)bVal;
-            colorData.A = (float)aVal;
+            colorData.R = (float)rVal / 255.0f;
+            colorData.G = (float)gVal / 255.0f;
+            colorData.B = (float)bVal / 255.0f;
+            colorData.A = (float)aVal / 255.0f;
             return state.RbNil;
         }
 

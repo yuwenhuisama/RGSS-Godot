@@ -61,14 +61,14 @@ class Font
 
   def initialize(*args)
     if args.size == 0
-      name = [Font.default_name]
+      name = Font.default_name
       size = Font.default_size
       @__handler__ = Unity::Font.new_ns(name, size)
-      return
     elsif args.length == 1
       arg, = args
       if arg.is_a? Unity::Font
         @__handler__ = arg
+        name = @__handler__.name
       elsif arg.is_a? String
         name = [arg]
         size = Font.default_size
@@ -93,13 +93,14 @@ class Font
       raise TypeError, "Invalid argument type"
     end
 
+    @name = name
     @__handler__.bold = Font.default_bold
     @__handler__.italic = Font.default_italic
     @__handler__.shadow = Font.default_shadow
     @__handler__.outline = Font.default_outline
     @__handler__.color = Font.default_color.__handler__
     @__handler__.out_color = Font.default_out_color.__handler__
-  end 
+  end
 
   def color
     Color.new @__handler__.color
@@ -132,6 +133,7 @@ class Font
     else
       @name = [value]
     end
+    @__handler__.name = @name
   end
 
   def eql?(other)
@@ -163,5 +165,13 @@ class Font
 
   def self.create_default_font
     Font.new("Arial", 24)
+  end
+
+  # RGSS3 Font.exist?(name) probes system font availability. The engine renders with
+  # font fallback (Arial substitute) when a face is missing, so report availability
+  # permissively rather than failing scripts that gate on this check.
+  def self.exist?(name)
+    TypeCheckUtil.check_type(name, String)
+    true
   end
 end
