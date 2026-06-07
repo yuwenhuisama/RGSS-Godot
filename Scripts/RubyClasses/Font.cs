@@ -41,15 +41,21 @@ namespace RGSSUnity.RubyClasses
                 .Select(v => v.ToStringUnchecked())
                 .ToArray();
 
+            var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
+            var outColorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
             var fontData = new FontData(state)
             {
                 Names = nameArr,
                 Size = (int)fontSize,
-                Color = new ColorData(state),
-                OutlineColor = new ColorData(state),
+                Color = colorObj.GetRDataObject<ColorData>(),
+                OutlineColor = outColorObj.GetRDataObject<ColorData>(),
             };
 
             var res = CreateFont(state, fontData);
+            // Store the Color wrappers so RGSS3 `font.color.set(...)` (Window_Base#change_color,
+            // the primary text-colour mechanism) mutates the live FontData.Color.
+            res["@color"] = colorObj;
+            res["@out_color"] = outColorObj;
             return res;
         }
 
@@ -148,14 +154,19 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("color")]
         public static RbValue GetColor(RbState state, RbValue self)
         {
+            // Return the stored Color wrapper so RGSS3 `font.color.set(...)` mutates the
+            // live FontData.Color the text renderer reads.
+            var stored = self["@color"];
+            if (!stored.IsNil)
+                return stored;
+
             var fontData = self.GetRDataObject<FontData>();
-            var color = Color.NewColor(state,
-                state.RbNil,
-                ((int)(fontData.Color.R * 255)).ToValue(state),
-                ((int)(fontData.Color.G * 255)).ToValue(state),
-                ((int)(fontData.Color.B * 255)).ToValue(state),
-                ((int)(fontData.Color.A * 255)).ToValue(state));
-            return color;
+            var colorObj = Color.CreateColor(state,
+                fontData.Color.R * 255.0f, fontData.Color.G * 255.0f,
+                fontData.Color.B * 255.0f, fontData.Color.A * 255.0f);
+            fontData.Color = colorObj.GetRDataObject<ColorData>();
+            self["@color"] = colorObj;
+            return colorObj;
         }
 
         [RbInstanceMethod("color=")]
@@ -165,20 +176,24 @@ namespace RGSSUnity.RubyClasses
             var colorData = color.GetRDataObject<ColorData>();
 
             fontData.Color = colorData;
+            self["@color"] = color;
             return state.RbNil;
         }
 
         [RbInstanceMethod("out_color")]
         public static RbValue GetOutColor(RbState state, RbValue self)
         {
+            var stored = self["@out_color"];
+            if (!stored.IsNil)
+                return stored;
+
             var fontData = self.GetRDataObject<FontData>();
-            var color = Color.NewColor(state,
-                state.RbNil,
-                ((int)(fontData.OutlineColor.R * 255)).ToValue(state),
-                ((int)(fontData.OutlineColor.G * 255)).ToValue(state),
-                ((int)(fontData.OutlineColor.B * 255)).ToValue(state),
-                ((int)(fontData.OutlineColor.A * 255)).ToValue(state));
-            return color;
+            var colorObj = Color.CreateColor(state,
+                fontData.OutlineColor.R * 255.0f, fontData.OutlineColor.G * 255.0f,
+                fontData.OutlineColor.B * 255.0f, fontData.OutlineColor.A * 255.0f);
+            fontData.OutlineColor = colorObj.GetRDataObject<ColorData>();
+            self["@out_color"] = colorObj;
+            return colorObj;
         }
 
         [RbInstanceMethod("out_color=")]
@@ -188,6 +203,7 @@ namespace RGSSUnity.RubyClasses
             var colorData = outColor.GetRDataObject<ColorData>();
 
             fontData.OutlineColor = colorData;
+            self["@out_color"] = outColor;
             return state.RbNil;
         }
     }

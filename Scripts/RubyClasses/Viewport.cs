@@ -132,17 +132,27 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("color")]
         public static RbValue GetColor(RbState state, RbValue self)
         {
+            // Return the stored Color wrapper so RGSS3 `viewport.color.set(...)`
+            // (screen flash) mutates the live ViewportData.FlashColor.
+            var stored = self["@color"];
+            if (!stored.IsNil)
+                return stored;
+
             var d = self.GetRDataObject<ViewportData>();
-            return Color.CreateColor(state,
-                (int)((d.FlashColor?.R ?? 0) * 255), (int)((d.FlashColor?.G ?? 0) * 255),
-                (int)((d.FlashColor?.B ?? 0) * 255), (int)((d.FlashColor?.A ?? 0) * 255));
+            var colorObj = Color.CreateColor(state,
+                (d.FlashColor?.R ?? 0.0f) * 255.0f, (d.FlashColor?.G ?? 0.0f) * 255.0f,
+                (d.FlashColor?.B ?? 0.0f) * 255.0f, (d.FlashColor?.A ?? 0.0f) * 255.0f);
+            d.FlashColor = colorObj.GetRDataObject<ColorData>();
+            self["@color"] = colorObj;
+            return colorObj;
         }
 
         [RbInstanceMethod("color=")]
         public static RbValue SetColor(RbState state, RbValue self, RbValue color)
         {
             var d = self.GetRDataObject<ViewportData>();
-            d.FlashColor = color.GetRDataObject<ColorData>();
+            d.FlashColor = color.IsNil ? null : color.GetRDataObject<ColorData>();
+            self["@color"] = color;
             return state.RbNil;
         }
 
@@ -153,7 +163,12 @@ namespace RGSSUnity.RubyClasses
             d.FlashDuration = (int)duration.ToIntUnchecked();
             d.FlashRemain = d.FlashDuration;
             if (!color.IsNil)
+            {
+                // Keep the stored @color wrapper and FlashColor as one instance so a later
+                // `viewport.color.set(...)` still targets the live flash color.
                 d.FlashColor = color.GetRDataObject<ColorData>();
+                self["@color"] = color;
+            }
             return state.RbNil;
         }
 
@@ -175,6 +190,7 @@ namespace RGSSUnity.RubyClasses
         private static RbValue CreateViewport(RbState state, int x, int y, int w, int h)
         {
             var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
+            var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
             var data = new ViewportData(state)
             {
                 X = x, Y = y,
@@ -183,12 +199,14 @@ namespace RGSSUnity.RubyClasses
                 Z = 0,
                 Visible = true,
                 Tone = toneObj.GetRDataObject<ToneData>(),
+                FlashColor = colorObj.GetRDataObject<ColorData>(),
             };
             GameRenderManager.Instance.RegisterViewport(data);
 
             var cls = RubyScriptManager.Instance.GetClassUnderUnityModule("Viewport");
             var obj = cls.NewObjectWithRData(data);
             obj["@tone"] = toneObj;
+            obj["@color"] = colorObj;
             return obj;
         }
     }

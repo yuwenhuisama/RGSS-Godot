@@ -12,11 +12,12 @@ public static class Plane
     {
         var viewportData = viewport.GetRDataObject<ViewportData>();
         var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
+        var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
         var data = new PlaneData(state)
         {
             Viewport = viewportData,
             Tone = toneObj.GetRDataObject<ToneData>(),
-            Color = new ColorData(state),
+            Color = colorObj.GetRDataObject<ColorData>(),
         };
 
         GameRenderManager.Instance.RegisterPlane(data, viewportData);
@@ -25,6 +26,7 @@ public static class Plane
         obj["@viewport"] = viewport;
         obj["@bitmap"] = state.RbNil;
         obj["@tone"] = toneObj;
+        obj["@color"] = colorObj;
         return obj;
     }
 
@@ -103,18 +105,28 @@ public static class Plane
     [RbInstanceMethod("color")]
     public static RbValue GetColor(RbState state, RbValue self)
     {
-        var color = self.GetRDataObject<PlaneData>().Color;
-        return Color.CreateColor(state,
-            (color?.R ?? 0.0f) * 255.0f,
-            (color?.G ?? 0.0f) * 255.0f,
-            (color?.B ?? 0.0f) * 255.0f,
-            (color?.A ?? 0.0f) * 255.0f);
+        // Return the stored Color wrapper so RGSS3 `plane.color.set(...)` mutates the
+        // live PlaneData.Color the renderer reads.
+        var stored = self["@color"];
+        if (!stored.IsNil)
+            return stored;
+
+        var data = self.GetRDataObject<PlaneData>();
+        var colorObj = Color.CreateColor(state,
+            (data.Color?.R ?? 0.0f) * 255.0f,
+            (data.Color?.G ?? 0.0f) * 255.0f,
+            (data.Color?.B ?? 0.0f) * 255.0f,
+            (data.Color?.A ?? 0.0f) * 255.0f);
+        data.Color = colorObj.GetRDataObject<ColorData>();
+        self["@color"] = colorObj;
+        return colorObj;
     }
 
     [RbInstanceMethod("color=")]
     public static RbValue SetColor(RbState state, RbValue self, RbValue color)
     {
         self.GetRDataObject<PlaneData>().Color = color.GetRDataObject<ColorData>();
+        self["@color"] = color;
         return state.RbNil;
     }
 

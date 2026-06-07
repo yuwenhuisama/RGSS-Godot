@@ -12,12 +12,14 @@ public static class Sprite
     {
         var viewportData = viewport.GetRDataObject<ViewportData>();
         var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
+        var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
+        var srcRectObj = Rect.CreateRect(state, 0, 0, 0, 0);
         var data = new SpriteData(state)
         {
             Viewport = viewportData,
-            SrcRect = new RectData(state),
+            SrcRect = srcRectObj.GetRDataObject<RectData>(),
             Tone = toneObj.GetRDataObject<ToneData>(),
-            Color = new ColorData(state),
+            Color = colorObj.GetRDataObject<ColorData>(),
         };
 
         GameRenderManager.Instance.RegisterSprite(data, viewportData);
@@ -26,6 +28,8 @@ public static class Sprite
         obj["@viewport"] = viewport;
         obj["@bitmap"] = state.RbNil;
         obj["@tone"] = toneObj;
+        obj["@color"] = colorObj;
+        obj["@src_rect"] = srcRectObj;
         return obj;
     }
 
@@ -104,22 +108,25 @@ public static class Sprite
     public static RbValue SetBitmap(RbState state, RbValue self, RbValue bitmap)
     {
         var data = self.GetRDataObject<SpriteData>();
+        // Mutate the existing SrcRect in place (keeping it === the stored @src_rect
+        // wrapper) so that a later `sprite.src_rect.set(...)` still hits live data.
+        data.SrcRect ??= EnsureSrcRect(state, self);
         if (bitmap.IsNil)
         {
             data.Bitmap = null;
-            data.SrcRect = new RectData(state);
+            data.SrcRect.X = 0;
+            data.SrcRect.Y = 0;
+            data.SrcRect.Width = 0;
+            data.SrcRect.Height = 0;
         }
         else
         {
             var bitmapData = bitmap.GetRDataObject<BitmapData>();
             data.Bitmap = bitmapData;
-            data.SrcRect = new RectData(state)
-            {
-                X = 0,
-                Y = 0,
-                Width = bitmapData.Width,
-                Height = bitmapData.Height,
-            };
+            data.SrcRect.X = 0;
+            data.SrcRect.Y = 0;
+            data.SrcRect.Width = bitmapData.Width;
+            data.SrcRect.Height = bitmapData.Height;
         }
 
         self["@bitmap"] = bitmap;
@@ -129,27 +136,49 @@ public static class Sprite
     [RbInstanceMethod("src_rect")]
     public static RbValue GetSrcRect(RbState state, RbValue self)
     {
-        var data = self.GetRDataObject<SpriteData>();
-        var rect = data.SrcRect;
-        if (rect is null)
-            return Rect.CreateRect(state, 0, 0, GetSourceWidth(data), GetSourceHeight(data));
+        // Return the stored Rect wrapper so RGSS3 `sprite.src_rect.set(...)`
+        // (character/animation frame selection) mutates the live SpriteData.SrcRect.
+        var stored = self["@src_rect"];
+        if (!stored.IsNil)
+            return stored;
 
-        return Rect.CreateRect(state, rect.X, rect.Y, rect.Width, rect.Height);
+        return EnsureSrcRectObj(state, self);
     }
 
     [RbInstanceMethod("src_rect=")]
     public static RbValue SetSrcRect(RbState state, RbValue self, RbValue rect)
     {
         var rectData = rect.GetRDataObject<RectData>();
-        self.GetRDataObject<SpriteData>().SrcRect = new RectData(state)
-        {
-            X = rectData.X,
-            Y = rectData.Y,
-            Width = rectData.Width,
-            Height = rectData.Height,
-        };
+        var data = self.GetRDataObject<SpriteData>();
+        // Mutate the existing SrcRect in place rather than replacing the instance, so the
+        // stored @src_rect wrapper stays bound to the live data.
+        data.SrcRect ??= EnsureSrcRect(state, self);
+        data.SrcRect.X = rectData.X;
+        data.SrcRect.Y = rectData.Y;
+        data.SrcRect.Width = rectData.Width;
+        data.SrcRect.Height = rectData.Height;
 
         return state.RbNil;
+    }
+
+    // Ensures a SrcRect RectData exists AND a matching @src_rect wrapper is stored,
+    // returning the RectData. Used to recover from any state where SrcRect is null.
+    private static RectData EnsureSrcRect(RbState state, RbValue self)
+        => EnsureSrcRectObj(state, self).GetRDataObject<RectData>();
+
+    private static RbValue EnsureSrcRectObj(RbState state, RbValue self)
+    {
+        var stored = self["@src_rect"];
+        if (!stored.IsNil)
+            return stored;
+
+        var data = self.GetRDataObject<SpriteData>();
+        var srcRectObj = Rect.CreateRect(state,
+            data.SrcRect?.X ?? 0, data.SrcRect?.Y ?? 0,
+            data.SrcRect?.Width ?? GetSourceWidth(data), data.SrcRect?.Height ?? GetSourceHeight(data));
+        data.SrcRect = srcRectObj.GetRDataObject<RectData>();
+        self["@src_rect"] = srcRectObj;
+        return srcRectObj;
     }
 
     [RbInstanceMethod("viewport")]
@@ -196,18 +225,28 @@ public static class Sprite
     [RbInstanceMethod("color")]
     public static RbValue GetColor(RbState state, RbValue self)
     {
-        var color = self.GetRDataObject<SpriteData>().Color;
-        return Color.CreateColor(state,
-            (color?.R ?? 0.0f) * 255.0f,
-            (color?.G ?? 0.0f) * 255.0f,
-            (color?.B ?? 0.0f) * 255.0f,
-            (color?.A ?? 0.0f) * 255.0f);
+        // Return the stored Color wrapper so RGSS3 `sprite.color.set(...)` (flash/fade
+        // blending) mutates the live SpriteData.Color the renderer reads.
+        var stored = self["@color"];
+        if (!stored.IsNil)
+            return stored;
+
+        var data = self.GetRDataObject<SpriteData>();
+        var colorObj = Color.CreateColor(state,
+            (data.Color?.R ?? 0.0f) * 255.0f,
+            (data.Color?.G ?? 0.0f) * 255.0f,
+            (data.Color?.B ?? 0.0f) * 255.0f,
+            (data.Color?.A ?? 0.0f) * 255.0f);
+        data.Color = colorObj.GetRDataObject<ColorData>();
+        self["@color"] = colorObj;
+        return colorObj;
     }
 
     [RbInstanceMethod("color=")]
     public static RbValue SetColor(RbState state, RbValue self, RbValue color)
     {
         self.GetRDataObject<SpriteData>().Color = color.GetRDataObject<ColorData>();
+        self["@color"] = color;
         return state.RbNil;
     }
 
