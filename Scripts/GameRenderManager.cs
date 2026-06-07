@@ -559,21 +559,21 @@ public sealed class GameRenderManager : IDisposable
         node.Position = new Vector2(data.X, data.Y + height * (1.0f - openness) / 2.0f);
 
         background.Visible = node.Visible && hasWindowskin;
-        background.Texture = GetAtlasTexture(background.Texture, data.Windowskin, new Rect2(0, 0, 64, 64));
+        background.Texture = GetRegionTexture(data.Windowskin, new Rect2I(0, 0, 64, 64));
         background.Position = new Vector2(1.0f, 1.0f);
         background.Size = new Vector2(backgroundWidth, backgroundHeight);
         background.ZIndex = data.Z;
         background.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.BackOpacity) * windowOpacity);
 
         tiledBackground.Visible = node.Visible && hasWindowskin;
-        tiledBackground.Texture = GetAtlasTexture(tiledBackground.Texture, data.Windowskin, new Rect2(0, 64, 64, 64));
+        tiledBackground.Texture = GetRegionTexture(data.Windowskin, new Rect2I(0, 64, 64, 64));
         tiledBackground.Position = background.Position;
         tiledBackground.Size = background.Size;
         tiledBackground.ZIndex = data.Z + 1;
         tiledBackground.Modulate = background.Modulate;
 
         border.Visible = node.Visible && hasWindowskin;
-        border.Texture = GetAtlasTexture(border.Texture, data.Windowskin, new Rect2(64, 0, 64, 64));
+        border.Texture = GetRegionTexture(data.Windowskin, new Rect2I(64, 0, 64, 64));
         border.Position = new Vector2(0.0f, 0.0f);
         border.Size = new Vector2(width, borderHeight);
         border.ZIndex = data.Z + 2;
@@ -614,7 +614,7 @@ public sealed class GameRenderManager : IDisposable
         var cursorRect = data.CursorRect;
         var hasCursor = hasWindowskin && cursorRect is { Width: > 0, Height: > 0 } && data.Openness == 255;
         cursor.Visible = node.Visible && hasCursor;
-        cursor.Texture = GetAtlasTexture(cursor.Texture, data.Windowskin, new Rect2(64, 64, 32, 32));
+        cursor.Texture = GetRegionTexture(data.Windowskin, new Rect2I(64, 64, 32, 32));
         cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, cursorRect.Y + data.Padding) : Vector2.Zero;
         cursor.Size = hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.Zero;
         cursor.ZIndex = data.Z + 4;
@@ -705,19 +705,36 @@ public sealed class GameRenderManager : IDisposable
         return contents;
     }
 
-    private static Texture2D? GetAtlasTexture(Texture2D? currentTexture, BitmapData? bitmap, Rect2 region)
+    // Godot's AtlasTexture does NOT clip correctly when fed to a NinePatchRect
+    // (get_scaled_rid returns the FULL atlas, so nine-patch + custom shaders sample
+    // the whole 128x128 windowskin and adjacent regions -- palette swatches, arrows,
+    // cursor -- bleed into the window). Documented Godot limitation. The robust fix
+    // is to extract each sub-region ONCE into its own standalone ImageTexture via
+    // Image.GetRegion(): NinePatchRect then nine-slices the isolated sub-image, and a
+    // canvas_item shader's TEXTURE/UV map exactly to it with zero bleed.
+    private static readonly Dictionary<(ulong, int, int, int, int), ImageTexture> RegionTextureCache = new();
+
+    private static Texture2D? GetRegionTexture(BitmapData? bitmap, Rect2I region)
     {
-        if (bitmap is not { Disposed: false, Texture: not null })
+        if (bitmap is not { Disposed: false, Image: not null })
             return null;
 
-        if (currentTexture is AtlasTexture atlasTexture && ReferenceEquals(atlasTexture.Atlas, bitmap.Texture) && atlasTexture.Region == region)
-            return atlasTexture;
+        var key = (bitmap.Image.GetInstanceId(), region.Position.X, region.Position.Y, region.Size.X, region.Size.Y);
+        if (RegionTextureCache.TryGetValue(key, out var cached) && cached is not null)
+            return cached;
 
-        return new AtlasTexture
-        {
-            Atlas = bitmap.Texture,
-            Region = region,
-        };
+        var img = bitmap.Image;
+        var clamped = region.Intersection(new Rect2I(0, 0, img.GetWidth(), img.GetHeight()));
+        if (clamped.Size.X <= 0 || clamped.Size.Y <= 0)
+            return null;
+
+        var sub = img.GetRegion(clamped);
+        if (sub.GetFormat() != Image.Format.Rgba8)
+            sub.Convert(Image.Format.Rgba8);
+
+        var tex = ImageTexture.CreateFromImage(sub);
+        RegionTextureCache[key] = tex;
+        return tex;
     }
 
     private static Vector2 GetNodeRenderSize(Node node)
