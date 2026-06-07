@@ -73,6 +73,57 @@ internal static class TilemapRenderer
         }
     }
 
+    // RGSS3 flash-tile blink alpha table (mkxp-z tilemapvx.cpp): 32-frame cycle, fades in
+    // then out; the rendered alpha is additionally halved at draw time.
+    public static readonly byte[] FlashAlpha =
+    {
+        0x78, 0x78, 0x78, 0x78, 0x96, 0x96, 0x96, 0x96,
+        0xB4, 0xB4, 0xB4, 0xB4, 0xD2, 0xD2, 0xD2, 0xD2,
+        0xF0, 0xF0, 0xF0, 0xF0, 0xD2, 0xD2, 0xD2, 0xD2,
+        0xB4, 0xB4, 0xB4, 0xB4, 0x96, 0x96, 0x96, 0x96,
+    };
+
+    public const int FlashCycle = 32;
+
+    // Flash overlay: a packed 0xRGB (4-bit each) colour additively blended over the tile,
+    // pulsing via FlashAlpha. Matches mkxp: out.rgb += colour.rgb * (FlashAlpha[idx]/255/2).
+    public static void DrawFlash(Image dst, int px, int py, int packed, int flashIdx)
+    {
+        if ((packed & 0x0FFF) == 0)
+            return;
+
+        var r = ((packed >> 8) & 0xF) / 15.0f;
+        var g = ((packed >> 4) & 0xF) / 15.0f;
+        var b = (packed & 0xF) / 15.0f;
+        var alpha = FlashAlpha[((flashIdx % FlashCycle) + FlashCycle) % FlashCycle] / 255.0f / 2.0f;
+
+        var dr = r * alpha;
+        var dg = g * alpha;
+        var db = b * alpha;
+
+        var w = dst.GetWidth();
+        var h = dst.GetHeight();
+        for (var yy = 0; yy < TileSize; yy++)
+        {
+            var iy = py + yy;
+            if (iy < 0 || iy >= h)
+                continue;
+            for (var xx = 0; xx < TileSize; xx++)
+            {
+                var ix = px + xx;
+                if (ix < 0 || ix >= w)
+                    continue;
+                var bg = dst.GetPixel(ix, iy);
+                // Additive over the existing (premultiplied-by-its-own-alpha) ground pixel.
+                dst.SetPixel(ix, iy, new Godot.Color(
+                    Mathf.Min(1.0f, bg.R + dr),
+                    Mathf.Min(1.0f, bg.G + dg),
+                    Mathf.Min(1.0f, bg.B + db),
+                    Mathf.Max(bg.A, alpha)));
+            }
+        }
+    }
+
     // ── Plain tiles ───────────────────────────────────────────────────────────────
     // B/C/D/E: 0..1023, 8 cols per half-page, 16 rows, alternating half-pages across sheets.
     private static bool DrawBcde(Image dst, int px, int py, int id, BitmapData?[] bitmaps)

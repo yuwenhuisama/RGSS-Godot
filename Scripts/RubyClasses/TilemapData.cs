@@ -25,6 +25,10 @@ public class TilemapData : RubyData
     // Autotile animation clock, advanced once per frame by Tilemap#update.
     public int AnimationTick;
 
+    // Flash-blink clock (separate cadence from autotile: wraps at 32), advanced by
+    // Tilemap#update. Drives the SRPG flash-tile pulse.
+    public int FlashTick;
+
     public Node2D? Node;
 
     // ── Compositor cache state (set by RenderTilemap) ────────────────────────
@@ -34,6 +38,7 @@ public class TilemapData : RubyData
     public int CachedOriginTileY = int.MinValue;
     public int CachedAnimFrameA = -1;
     public int CachedAnimFrameC = -1;
+    public int CachedFlashAlpha = -1;
     public ulong CachedMapDataId;
     public bool LayersDirty = true;       // force first composite
 

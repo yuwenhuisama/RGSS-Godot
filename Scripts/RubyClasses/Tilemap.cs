@@ -53,8 +53,11 @@ public static class Tilemap
     [RbInstanceMethod("update")]
     public static RbValue Update(RbState state, RbValue self)
     {
-        // Advances autotile animation, mirroring RGSS3 Tilemap#update (once per frame).
-        self.GetRDataObject<TilemapData>().AnimationTick++;
+        // Advances autotile animation and the flash-tile blink, mirroring RGSS3
+        // Tilemap#update (once per frame). They use separate cadences.
+        var data = self.GetRDataObject<TilemapData>();
+        data.AnimationTick++;
+        data.FlashTick++;
         return state.RbNil;
     }
 

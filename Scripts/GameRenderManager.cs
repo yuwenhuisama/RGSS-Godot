@@ -979,21 +979,28 @@ public sealed class GameRenderManager : IDisposable
         var animC = AnimIndicesC[(data.AnimationTick / 30) % AnimIndicesC.Length];
         var mapId = (ulong)data.MapData.GetHashCode();
 
+        // Flash blink phase only matters (and only forces recompositing) when flash data
+        // is present, so ordinary maps never recomposite just for the flash counter.
+        var flashIdx = ((data.FlashTick % TilemapRenderer.FlashCycle) + TilemapRenderer.FlashCycle) % TilemapRenderer.FlashCycle;
+        var flashAlpha = data.FlashData is not null ? TilemapRenderer.FlashAlpha[flashIdx] : -1;
+
         // Recomposite only when the visible chunk, map, flags, or animation phase changes.
         var needComposite = data.LayersDirty
             || data.CachedOriginTileX != originTileX
             || data.CachedOriginTileY != originTileY
             || data.CachedAnimFrameA != animA
             || data.CachedAnimFrameC != animC
+            || data.CachedFlashAlpha != flashAlpha
             || data.CachedMapDataId != mapId;
 
         if (needComposite)
         {
-            CompositeTilemap(data, ground, over, originTileX, originTileY, tilesW, tilesH, animA, animC);
+            CompositeTilemap(data, ground, over, originTileX, originTileY, tilesW, tilesH, animA, animC, flashIdx);
             data.CachedOriginTileX = originTileX;
             data.CachedOriginTileY = originTileY;
             data.CachedAnimFrameA = animA;
             data.CachedAnimFrameC = animC;
+            data.CachedFlashAlpha = flashAlpha;
             data.CachedMapDataId = mapId;
             data.LayersDirty = false;
         }
@@ -1009,7 +1016,7 @@ public sealed class GameRenderManager : IDisposable
 
     private static void CompositeTilemap(
         TilemapData data, Sprite2D ground, Sprite2D over,
-        int originTileX, int originTileY, int tilesW, int tilesH, int animA, int animC)
+        int originTileX, int originTileY, int tilesW, int tilesH, int animA, int animC, int flashAlphaIdx)
     {
         var map = data.MapData!;
         var pixelW = tilesW * TilemapRenderer.TileSize;
@@ -1023,6 +1030,7 @@ public sealed class GameRenderManager : IDisposable
         var mapW = map.XSize;
         var mapH = map.YSize;
         var hasShadowLayer = map.ZSize >= 4;
+        var flash = data.FlashData;
 
         for (var ty = 0; ty < tilesH; ty++)
         {
@@ -1053,11 +1061,29 @@ public sealed class GameRenderManager : IDisposable
                         TilemapRenderer.DrawShadow(groundImg, px, py, shadow);
                 }
                 DrawMapTile(data, groundImg, overImg, map, wx, wy, 2, px, py, animA, animC);
+
+                // Flash overlay (SRPG move-range pulse), additively blended over the tile.
+                if (flash is not null)
+                {
+                    var packed = GetFlashColor(flash, wx, wy);
+                    if (packed != 0)
+                        TilemapRenderer.DrawFlash(groundImg, px, py, packed, flashAlphaIdx);
+                }
             }
         }
 
         ApplyLayerImage(ground, groundImg);
         ApplyLayerImage(over, overImg);
+    }
+
+    private static int GetFlashColor(TableData flash, int x, int y)
+    {
+        if (flash.XSize <= 0 || flash.YSize <= 0)
+            return 0;
+        var index = x + y * flash.XSize;   // flash_data is a 2D width x height Table
+        if (index < 0 || index >= flash.Data.Length)
+            return 0;
+        return flash.Data[index] & 0xFFFF;
     }
 
     // Positive modulo wrap for loop-map tile reads. Returns -1 for a non-positive size.
