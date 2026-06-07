@@ -100,21 +100,49 @@ public static class Graphics
     private static RbValue Freeze(RbState state, RbValue self)
     {
         Freezing = true;
+        GameRenderManager.Instance.FreezeScreen();
         return state.RbNil;
     }
 
     [RbModuleMethod("transition")]
-    private static RbValue Transition(RbState state, RbValue self, RbValue duration, RbValue filename, RbValue vague)
+    private static RbValue Transition(RbState state, RbValue self, RbValue duration, RbValue maskBitmap, RbValue vague)
     {
-        // Start-only brightness-ramp transition. After a preceding fadeout the screen is
-        // black (brightness 0) and the new scene is already built, so ramping 0->1 fades
-        // the new scene in from black. With no preceding fadeout (brightness already 1)
-        // this is an instant no-op. The Ruby Graphics.transition wrapper drives the
-        // per-frame waiting. `filename`/`vague` (masked crossfade) are a future phase.
         Freezing = false;
         int frames = Math.Max(0, (int)duration.ToIntUnchecked());
-        GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+
+        // No mask (nil filename): keep the Phase 1 brightness-ramp transition. After a
+        // preceding fadeout the screen is black and this fades the new scene in; with no
+        // fadeout (brightness already 1) it is an instant no-op.
+        if (maskBitmap.IsNil)
+        {
+            GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+            return state.RbNil;
+        }
+
+        // Masked transition (e.g. battle entry): dissolve the frozen old screen into the
+        // live new scene through the mask's red channel over `frames` frames.
+        var maskData = maskBitmap.GetRDataObject<BitmapData>();
+        if (maskData.Disposed || maskData.Image is null || maskData.Image.IsEmpty())
+        {
+            GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+            return state.RbNil;
+        }
+
+        var maskTexture = CreateOwnedTextureCopy(maskData.Image);
+        int vagueValue = (int)vague.ToIntUnchecked();
+        GameRenderManager.Instance.StartTransition(maskTexture, vagueValue, frames);
         return state.RbNil;
+    }
+
+    // Build an independent ImageTexture from the mask bitmap's image without mutating
+    // the cached Bitmap (it may be reused). Duplicate, convert to Rgba8, then upload.
+    private static ImageTexture CreateOwnedTextureCopy(Image source)
+    {
+        var copy = Image.CreateEmpty(source.GetWidth(), source.GetHeight(), false, source.GetFormat());
+        copy.BlitRect(source, new Rect2I(0, 0, source.GetWidth(), source.GetHeight()), Vector2I.Zero);
+        if (copy.GetFormat() != Image.Format.Rgba8)
+            copy.Convert(Image.Format.Rgba8);
+        return ImageTexture.CreateFromImage(copy);
     }
 
     [RbModuleMethod("resize_screen")]

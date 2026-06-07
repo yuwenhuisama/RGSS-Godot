@@ -77,6 +77,7 @@ func _all_tests() -> Array:
 	t.append_array(_viewport_tests())
 	t.append_array(_window_tests())
 	t.append_array(_tilemap_tests())
+	t.append_array(_graphics_tests())
 	return t
 
 
@@ -343,6 +344,106 @@ raise 'font' unless b.font.is_a?(Font)
 b.dispose
 true
 """],
+		["Bitmap#fill_rect fills pixels with color", _ASSERT + """
+b = Bitmap.new(8, 8)
+b.fill_rect(0, 0, 8, 8, Color.new(0, 255, 0, 255))
+c = b.get_pixel(4, 4)
+raise "fill got #{c.red},#{c.green},#{c.blue}" unless c.green > 250 && c.red < 5 && c.blue < 5
+b.dispose
+true
+"""],
+		["Bitmap#fill_rect(rect, color) overload", _ASSERT + """
+b = Bitmap.new(8, 8)
+b.fill_rect(Rect.new(0, 0, 8, 8), Color.new(0, 0, 255, 255))
+c = b.get_pixel(2, 2)
+raise 'fill rect overload' unless c.blue > 250 && c.red < 5
+b.dispose
+true
+"""],
+		["Bitmap#clear wipes to transparent", _ASSERT + """
+b = Bitmap.new(8, 8)
+b.fill_rect(0, 0, 8, 8, Color.new(255, 255, 255, 255))
+b.clear
+c = b.get_pixel(4, 4)
+raise "clear alpha #{c.alpha}" unless c.alpha < 5
+b.dispose
+true
+"""],
+		["Bitmap#clear_rect clears a region", _ASSERT + """
+b = Bitmap.new(8, 8)
+b.fill_rect(0, 0, 8, 8, Color.new(255, 0, 0, 255))
+b.clear_rect(0, 0, 4, 4)
+c0 = b.get_pixel(1, 1); c1 = b.get_pixel(6, 6)
+raise 'cleared region' unless c0.alpha < 5
+raise 'kept region' unless c1.red > 250
+b.dispose
+true
+"""],
+		["Bitmap#blt copies from source", _ASSERT + """
+src = Bitmap.new(8, 8); src.fill_rect(0, 0, 8, 8, Color.new(255, 0, 0, 255))
+dst = Bitmap.new(16, 16)
+dst.blt(4, 4, src, Rect.new(0, 0, 8, 8))
+c = dst.get_pixel(6, 6); edge = dst.get_pixel(0, 0)
+raise 'blt copied' unless c.red > 250
+raise 'blt bounded' unless edge.alpha < 5
+src.dispose; dst.dispose
+true
+"""],
+		["Bitmap#stretch_blt scales source", _ASSERT + """
+src = Bitmap.new(4, 4); src.fill_rect(0, 0, 4, 4, Color.new(0, 255, 0, 255))
+dst = Bitmap.new(16, 16)
+dst.stretch_blt(Rect.new(0, 0, 16, 16), src, Rect.new(0, 0, 4, 4))
+c = dst.get_pixel(8, 8)
+raise 'stretch_blt' unless c.green > 250
+src.dispose; dst.dispose
+true
+"""],
+		["Bitmap#gradient_fill_rect endpoints differ", _ASSERT + """
+b = Bitmap.new(16, 4)
+b.gradient_fill_rect(0, 0, 16, 4, Color.new(255,0,0,255), Color.new(0,0,255,255))
+left = b.get_pixel(0, 2); right = b.get_pixel(15, 2)
+raise 'grad left red' unless left.red > 200
+raise 'grad right blue' unless right.blue > 200
+b.dispose
+true
+"""],
+		["Bitmap#text_size returns a Rect with positive size", _ASSERT + """
+b = Bitmap.new(64, 32)
+r = b.text_size('Hi')
+raise 'text_size type' unless r.is_a?(Rect)
+raise "text_size w #{r.width}" unless r.width > 0 && r.height > 0
+b.dispose
+true
+"""],
+		["Bitmap#draw_text does not raise", _ASSERT + """
+b = Bitmap.new(64, 32)
+b.draw_text(0, 0, 64, 32, 'Hello', 1)
+b.draw_text(Rect.new(0, 0, 64, 32), 'X')
+b.draw_text(0, 0, 64, 32, 123)   # non-String coerced via to_s
+b.dispose
+true
+"""],
+		["Bitmap#hue_change does not raise", _ASSERT + """
+b = Bitmap.new(8, 8); b.fill_rect(0, 0, 8, 8, Color.new(255, 0, 0, 255))
+b.hue_change(120)
+b.dispose
+true
+"""],
+		["Bitmap#blur / radial_blur do not raise", _ASSERT + """
+b = Bitmap.new(8, 8); b.fill_rect(0, 0, 8, 8, Color.new(255, 255, 255, 255))
+b.blur
+b.radial_blur(180, 4)
+b.dispose
+true
+"""],
+		["Bitmap#font= and rect= round-trip", _ASSERT + """
+b = Bitmap.new(8, 8)
+f = Font.new('Arial', 18); b.font = f
+raise 'font=' unless b.font.size == 18
+b.rect = Rect.new(0, 0, 8, 8)   # setter must not raise
+b.dispose
+true
+"""],
 	]
 
 
@@ -387,6 +488,60 @@ raise 'blend_type range not validated' unless ok
 s.dispose
 true
 """],
+		["Sprite ox/oy/zoom_y/angle/mirror round-trip", _ASSERT + """
+s = Sprite.new
+s.ox = 4; s.oy = 6; s.zoom_y = 1.5; s.angle = 90; s.mirror = true
+_eq(s.ox, 4, 'ox'); _eq(s.oy, 6, 'oy')
+_aeq(s.zoom_y, 1.5, 0.001, 'zoom_y'); _aeq(s.angle, 90, 0.5, 'angle'); _eq(s.mirror, true, 'mirror')
+s.dispose
+true
+"""],
+		["Sprite bush + wave properties round-trip", _ASSERT + """
+s = Sprite.new
+s.bush_depth = 8; s.bush_opacity = 100
+s.wave_amp = 5; s.wave_length = 90; s.wave_speed = 200; s.wave_phase = 45
+_eq(s.bush_depth, 8, 'bush_depth'); _eq(s.bush_opacity, 100, 'bush_opacity')
+_eq(s.wave_amp, 5, 'wave_amp'); _eq(s.wave_length, 90, 'wave_length')
+_eq(s.wave_speed, 200, 'wave_speed'); _aeq(s.wave_phase, 45, 0.5, 'wave_phase')
+s.dispose
+true
+"""],
+		["Sprite#color and #tone round-trip", _ASSERT + """
+s = Sprite.new
+s.color = Color.new(255, 0, 0, 128)
+_aeq(s.color.red, 255, 0.6, 'color r'); _aeq(s.color.alpha, 128, 0.6, 'color a')
+s.tone = Tone.new(50, -50, 25, 80)
+_aeq(s.tone.red, 50, 0.6, 'tone r'); _aeq(s.tone.gray, 80, 0.6, 'tone gray')
+s.dispose
+true
+"""],
+		["Sprite#src_rect + width/height track bitmap", _ASSERT + """
+s = Sprite.new
+b = Bitmap.new(40, 30); s.bitmap = b
+_eq(s.width, 40, 'width'); _eq(s.height, 30, 'height')
+s.src_rect = Rect.new(0, 0, 10, 12)
+_eq(s.src_rect.width, 10, 'src w')
+s.dispose; b.dispose
+true
+"""],
+		["Sprite#flash(color/nil) and #update do not raise", _ASSERT + """
+s = Sprite.new
+s.flash(Color.new(255,255,255,255), 8)
+s.update
+s.flash(nil, 8)   # hide-flash
+s.update
+s.dispose
+true
+"""],
+		["Sprite#viewport= nil resets to default", _ASSERT + """
+vp = Viewport.new(0, 0, 32, 32)
+s = Sprite.new(vp)
+raise 'has viewport' if s.viewport.nil?
+s.viewport = nil
+_eq(s.viewport, nil, 'nil viewport')
+s.dispose; vp.dispose
+true
+"""],
 	]
 
 
@@ -415,6 +570,18 @@ _eq(p.bitmap, nil, 'nil bitmap')
 p.dispose
 true
 """],
+		["Plane color/tone/opacity/blend_type/zoom round-trip", _ASSERT + """
+p = Plane.new
+p.color = Color.new(10, 20, 30, 40)
+_aeq(p.color.red, 10, 0.6, 'color r')
+p.tone = Tone.new(5, 5, 5, 10); _aeq(p.tone.gray, 10, 0.6, 'tone gray')
+p.opacity = 200; _eq(p.opacity, 200, 'opacity')
+p.blend_type = 1; _eq(p.blend_type, 1, 'blend')
+p.zoom_x = 2.0; p.zoom_y = 3.0
+_aeq(p.zoom_x, 2.0, 0.001, 'zx'); _aeq(p.zoom_y, 3.0, 0.001, 'zy')
+p.dispose
+true
+"""],
 	]
 
 
@@ -440,6 +607,15 @@ true
 v = Viewport.new(0, 0, 32, 32)
 v.flash(Color.new(255,255,255,255), 10)
 v.flash(nil, 10)
+v.dispose
+true
+"""],
+		["Viewport color/tone/rect= round-trip", _ASSERT + """
+v = Viewport.new(0, 0, 32, 32)
+v.color = Color.new(60, 70, 80, 90); _aeq(v.color.blue, 80, 0.6, 'color b')
+v.tone = Tone.new(-30, 0, 30, 50); _aeq(v.tone.red, -30, 0.6, 'tone r')
+v.rect = Rect.new(5, 6, 40, 50)
+_eq(v.rect.x, 5, 'rect x'); _eq(v.rect.height, 50, 'rect h')
 v.dispose
 true
 """],
@@ -477,6 +653,39 @@ _eq(w.x, 5, 'x'); _eq(w.width, 40, 'w')
 w.dispose
 true
 """],
+		["Window active/visible/pause/arrows_visible booleans", _ASSERT + """
+w = Window.new(0, 0, 100, 80)
+w.active = false; _eq(w.active, false, 'active')
+w.visible = false; _eq(w.visible, false, 'visible')
+w.pause = true; _eq(w.pause, true, 'pause')
+w.arrows_visible = false; _eq(w.arrows_visible, false, 'arrows')
+w.dispose
+true
+"""],
+		["Window contents/windowskin are Bitmaps", _ASSERT + """
+w = Window.new(0, 0, 100, 80)
+w.contents = Bitmap.new(80, 60)
+raise 'contents' unless w.contents.is_a?(Bitmap)
+_eq(w.contents.width, 80, 'contents w')
+w.dispose
+true
+"""],
+		["Window cursor_rect + tone + ox/oy + z round-trip", _ASSERT + """
+w = Window.new(0, 0, 100, 80)
+w.cursor_rect = Rect.new(2, 4, 20, 16)
+_eq(w.cursor_rect.width, 20, 'cursor w')
+w.tone = Tone.new(10, 20, 30, 0); _aeq(w.tone.green, 20, 0.6, 'tone g')
+w.ox = 3; w.oy = 5; w.z = 200
+_eq(w.ox, 3, 'ox'); _eq(w.z, 200, 'z')
+w.dispose
+true
+"""],
+		["Window contents_opacity clamps", _ASSERT + """
+w = Window.new(0, 0, 100, 80)
+w.contents_opacity = 999; _eq(w.contents_opacity, 255, 'co clamp')
+w.dispose
+true
+"""],
 	]
 
 
@@ -505,6 +714,36 @@ b = Bitmap.new(32, 32)
 tm.bitmaps[0] = b
 raise 'bitmaps[0]' unless tm.bitmaps[0].equal?(b)
 tm.dispose
+true
+"""],
+	]
+
+
+# ============================ GRAPHICS (value methods only) ============================
+# update/wait/fadeout/fadein/transition need the Fiber-pump context and are exercised by
+# the boot/scene integration tests, not here (a bare Fiber.yield would mis-yield).
+func _graphics_tests() -> Array:
+	return [
+		["Graphics.width/height are positive", _ASSERT + """
+raise "w #{Graphics.width}" unless Graphics.width > 0
+raise "h #{Graphics.height}" unless Graphics.height > 0
+true
+"""],
+		["Graphics.frame_rate= round-trips", _ASSERT + """
+old = Graphics.frame_rate
+Graphics.frame_rate = 30; _eq(Graphics.frame_rate, 30, 'fr 30')
+Graphics.frame_rate = 60; _eq(Graphics.frame_rate, 60, 'fr 60')
+Graphics.frame_rate = old
+true
+"""],
+		["Graphics.frame_count= and frame_reset", _ASSERT + """
+Graphics.frame_count = 123; _eq(Graphics.frame_count, 123, 'fc set')
+Graphics.frame_reset; _eq(Graphics.frame_count, 0, 'fc reset')
+true
+"""],
+		["Graphics.brightness= round-trips 0..255", _ASSERT + """
+Graphics.brightness = 128; _aeq(Graphics.brightness, 128, 1.0, 'b 128')
+Graphics.brightness = 255; _aeq(Graphics.brightness, 255, 1.0, 'b 255')
 true
 """],
 	]

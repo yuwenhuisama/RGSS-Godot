@@ -36,6 +36,21 @@ public sealed class GameRenderManager : IDisposable
     private float fadeTargetBrightness = 1.0f;
     private int fadeTotalFrames;
     private int fadeFramesElapsed;
+
+    // Masked screen transition (Graphics.freeze + Graphics.transition with a mask image).
+    private ShaderMaterial? transitionMaterial;
+    private Texture2D? frozenTexture;
+    private Texture2D? newTexture;
+    private Texture2D? maskTexture;
+    private bool transitionActive;
+    private int transitionTotalFrames;
+    private int transitionFramesElapsed;
+    private float transitionVague;
+    // Graphics.freeze right after a transition would otherwise capture the last dissolve
+    // frame; defer that capture one frame so it grabs the live (post-transition) screen.
+    private bool transitionFinishedThisFrame;
+    private bool captureFrozenOnNextUpdate;
+
     private bool initialized;
     private bool viewportNodeCreationReady;
 
@@ -96,6 +111,10 @@ public sealed class GameRenderManager : IDisposable
         this.postprocessQuad.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         this.postprocessLayer.AddChild(this.postprocessQuad);
 
+        var transitionShader = GD.Load<Shader>("res://Shaders/TransitionPostprocessShader.gdshader");
+        if (transitionShader is not null)
+            this.transitionMaterial = new ShaderMaterial { Shader = transitionShader };
+
         var spriteShader = GD.Load<Shader>("res://Shaders/SpriteShader.gdshader");
         if (spriteShader is not null)
             this.spriteMaterial = new ShaderMaterial { Shader = spriteShader };
@@ -105,7 +124,20 @@ public sealed class GameRenderManager : IDisposable
 
     public void Update()
     {
+        // A deferred freeze (requested right after a transition finished) captures the
+        // now-rendered live frame.
+        if (this.captureFrozenOnNextUpdate)
+        {
+            this.CaptureFrozenTextureNow();
+            this.captureFrozenOnNextUpdate = false;
+        }
+
+        // The "just finished" flag only suppresses a same-turn synchronous freeze; one
+        // engine frame has now elapsed, so clear it.
+        this.transitionFinishedThisFrame = false;
+
         this.TickBrightnessFade();
+        this.TickTransition();
         ResetDirtyDataSet();
 
         if (this.pendingViewports.Count > 0 && this.initialized && this.renderRoot is not null)
@@ -517,6 +549,15 @@ public sealed class GameRenderManager : IDisposable
         this.parent = null;
         this.spriteMaterial = null;
         this.postprocessMaterial = null;
+
+        this.transitionActive = false;
+        this.captureFrozenOnNextUpdate = false;
+        this.transitionFinishedThisFrame = false;
+        ReleaseTexture(ref this.maskTexture);
+        ReleaseTexture(ref this.frozenTexture);
+        ReleaseTexture(ref this.newTexture);
+        this.transitionMaterial = null;
+
         this.initialized = false;
         this.viewportNodeCreationReady = false;
     }
@@ -1300,6 +1341,141 @@ void fragment() {
         }
 
         this.ApplyGraphicsBrightness(this.graphicsBrightness);
+    }
+
+    // ── Masked screen transition (Graphics.freeze + Graphics.transition) ─────────────
+
+    // Capture the current rendered screen into frozenTexture for use as the transition's
+    // "old" frame. Deferred by one frame if requested right after a transition finished
+    // (so battle, not the last dissolve frame, is captured).
+    public void FreezeScreen()
+    {
+        if (!this.initialized)
+            return;
+
+        if (this.transitionFinishedThisFrame)
+        {
+            this.captureFrozenOnNextUpdate = true;
+            return;
+        }
+
+        this.CaptureFrozenTextureNow();
+    }
+
+    private void CaptureFrozenTextureNow()
+    {
+        var viewport = this.parent?.GetViewport();
+        if (viewport is null)
+            return;
+
+        var image = viewport.GetTexture()?.GetImage();
+        if (image is null || image.IsEmpty())
+            return;
+
+        if (image.GetFormat() != Image.Format.Rgba8)
+            image.Convert(Image.Format.Rgba8);
+
+        ReleaseTexture(ref this.frozenTexture);
+        this.frozenTexture = ImageTexture.CreateFromImage(image);
+    }
+
+    // Begin a masked dissolve of the frozen (old) screen toward black, revealed through
+    // the mask over `durationFrames`. This matches native VX Ace: the BattleStart mask
+    // dissolves the old map away (the new battle scene does not exist yet during this
+    // transition -- it is built only after the old scene's fiber fully terminates), then
+    // the battle appears. Ownership of maskTexture transfers here.
+    public void StartTransition(Texture2D maskTexture, int vague, int durationFrames)
+    {
+        this.brightnessFadeActive = false;
+        this.graphicsBrightness = 1.0f;
+        this.ApplyGraphicsBrightness(1.0f);
+
+        if (this.transitionActive)
+            this.FinishTransition(markFinished: false);
+
+        // Capture the OLD scene now if Graphics.freeze didn't already (defensive).
+        if (this.frozenTexture is null)
+            this.CaptureFrozenTextureNow();
+
+        // Fall back to an instant finish if we can't run a real dissolve.
+        if (durationFrames <= 0 || this.postprocessQuad is null || this.transitionMaterial is null || this.frozenTexture is null)
+        {
+            maskTexture.Dispose();
+            ReleaseTexture(ref this.frozenTexture);
+            if (this.postprocessQuad is not null && this.postprocessMaterial is not null)
+                this.postprocessQuad.Material = this.postprocessMaterial;
+            this.transitionFinishedThisFrame = true;
+            return;
+        }
+
+        ReleaseTexture(ref this.maskTexture);
+        this.maskTexture = maskTexture;
+
+        this.transitionTotalFrames = Math.Max(1, durationFrames);
+        this.transitionFramesElapsed = 0;
+        this.transitionVague = Math.Max(vague / 256.0f, 0.0001f);
+        this.transitionActive = true;
+
+        // The "new" side is a 1x1 black texture: the mask reveals black where it has
+        // progressed, dissolving the old scene away. Set uniforms BEFORE the material swap
+        // to avoid a one-frame flicker.
+        this.newTexture = CreateBlackTexture();
+        this.transitionMaterial.SetShaderParameter("frozen_tex", this.frozenTexture);
+        this.transitionMaterial.SetShaderParameter("new_tex", this.newTexture);
+        this.transitionMaterial.SetShaderParameter("transition_tex", this.maskTexture);
+        this.transitionMaterial.SetShaderParameter("vague", this.transitionVague);
+        this.transitionMaterial.SetShaderParameter("progress", 0.0f);
+        this.postprocessQuad.Material = this.transitionMaterial;
+    }
+
+    private static Texture2D CreateBlackTexture()
+    {
+        var img = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+        img.SetPixel(0, 0, Colors.Black);
+        return ImageTexture.CreateFromImage(img);
+    }
+
+    private void TickTransition()
+    {
+        if (!this.transitionActive)
+            return;
+
+        this.transitionFramesElapsed++;
+        if (this.transitionFramesElapsed >= this.transitionTotalFrames)
+        {
+            this.FinishTransition(markFinished: true);
+            return;
+        }
+
+        float progress = (float)this.transitionFramesElapsed / this.transitionTotalFrames;
+        this.transitionMaterial?.SetShaderParameter("progress", progress);
+    }
+
+    private void FinishTransition(bool markFinished)
+    {
+        this.transitionActive = false;
+        this.transitionFramesElapsed = 0;
+        this.transitionTotalFrames = 0;
+
+        this.graphicsBrightness = 1.0f;
+        this.brightnessFadeActive = false;
+        this.ApplyGraphicsBrightness(1.0f);
+
+        if (this.postprocessQuad is not null && this.postprocessMaterial is not null)
+            this.postprocessQuad.Material = this.postprocessMaterial;
+
+        ReleaseTexture(ref this.maskTexture);
+        ReleaseTexture(ref this.frozenTexture);
+        ReleaseTexture(ref this.newTexture);
+
+        if (markFinished)
+            this.transitionFinishedThisFrame = true;
+    }
+
+    private static void ReleaseTexture(ref Texture2D? texture)
+    {
+        texture?.Dispose();
+        texture = null;
     }
 
     private static Vector4 BuildFlashVector(SpriteData data)

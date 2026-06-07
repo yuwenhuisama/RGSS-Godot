@@ -76,8 +76,26 @@ module Graphics
   def self.transition(duration = 10, filename = nil, vague = 40)
     check_arguments([duration, filename, vague], [Integer, [String, NilClass], Integer])
     duration = __rgss_frame_count(duration)
-    Unity::Graphics.transition(duration, filename, vague)
+    mask = __rgss_transition_mask(filename)
+    Unity::Graphics.transition(duration, mask&.__handler__, vague)
     wait(duration)
+  end
+
+  # Load the transition mask image (e.g. "Graphics/System/BattleStart") through the
+  # RTP-aware Cache.load_bitmap so path resolution + .png fallback are reused. Returns
+  # nil for an absent/empty filename (the C# side then keeps the brightness-ramp path).
+  def self.__rgss_transition_mask(filename)
+    return nil if filename.nil? || filename.empty?
+    path = filename.tr("\\", "/")
+    slash = path.rindex("/")
+    if slash
+      folder = path[0..slash]
+      name = path[(slash + 1)..-1]
+    else
+      folder = ""
+      name = path
+    end
+    Cache.load_bitmap(folder, name)
   end
 
   def self.resize_screen(width = 1920, height = 1080)
