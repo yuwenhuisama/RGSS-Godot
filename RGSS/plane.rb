@@ -70,8 +70,8 @@ class Plane
 
   TYPE_CHECK_MAP = {
     :z => Integer,
-    :ox => Integer,
-    :oy => Integer,
+    :ox => [Integer, Float],
+    :oy => [Integer, Float],
     :zoom_x => [Integer, Float],
     :zoom_y => [Integer, Float],
     :opacity => Integer,

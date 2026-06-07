@@ -159,7 +159,7 @@ public static class Plane
     [RbInstanceMethod("ox=")]
     public static RbValue SetOx(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<PlaneData>().Ox = (int)value.ToIntUnchecked();
+        self.GetRDataObject<PlaneData>().Ox = value.IsFloat ? (int)value.ToFloatUnchecked() : (int)value.ToIntUnchecked();
         return state.RbNil;
     }
 
@@ -170,7 +170,7 @@ public static class Plane
     [RbInstanceMethod("oy=")]
     public static RbValue SetOy(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<PlaneData>().Oy = (int)value.ToIntUnchecked();
+        self.GetRDataObject<PlaneData>().Oy = value.IsFloat ? (int)value.ToFloatUnchecked() : (int)value.ToIntUnchecked();
         return state.RbNil;
     }
 

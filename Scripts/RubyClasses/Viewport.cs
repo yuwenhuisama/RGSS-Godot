@@ -76,7 +76,7 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("ox=")]
         public static RbValue SetOx(RbState state, RbValue self, RbValue ox)
         {
-            self.GetRDataObject<ViewportData>().Ox = (int)ox.ToIntUnchecked();
+            self.GetRDataObject<ViewportData>().Ox = ox.IsFloat ? (int)ox.ToFloatUnchecked() : (int)ox.ToIntUnchecked();
             return state.RbNil;
         }
 
@@ -87,7 +87,7 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("oy=")]
         public static RbValue SetOy(RbState state, RbValue self, RbValue oy)
         {
-            self.GetRDataObject<ViewportData>().Oy = (int)oy.ToIntUnchecked();
+            self.GetRDataObject<ViewportData>().Oy = oy.IsFloat ? (int)oy.ToFloatUnchecked() : (int)oy.ToIntUnchecked();
             return state.RbNil;
         }
 
