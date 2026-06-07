@@ -164,13 +164,18 @@ module Cache
       unless filename.include?('.')
         filename = filename + ".png"
       end
-      path = DataManager.__get_real_path__(folder_name)
-      begin
-        old_load_bitmap(path, filename, hue)
-      rescue
-        # try to load bitmap from rtp
-        path = DataManager.__get_rtp_path__(folder_name)
-        old_load_bitmap(path, filename, hue)
+      # RTP fallback must be decided HERE in Ruby: a missing-file RGSSError raised
+      # from the C# Bitmap.new binding cannot be caught by `rescue` across the
+      # mruby-dotnet callback boundary. Probe both candidate paths with the
+      # non-raising Unity::Bitmap.file_exists? binding, then load from whichever
+      # exists (defaulting to the RTP path so the final failure still comes from
+      # Bitmap.new with a real error message).
+      real_path = DataManager.__get_real_path__(folder_name)
+      if Unity::Bitmap.file_exists?(real_path + filename)
+        old_load_bitmap(real_path, filename, hue)
+      else
+        rtp_path = DataManager.__get_rtp_path__(folder_name)
+        old_load_bitmap(rtp_path, filename, hue)
       end
     end
   end

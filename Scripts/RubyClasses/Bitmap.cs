@@ -46,6 +46,19 @@ public static class Bitmap
         return CreateBitmapObject(state, image);
     }
 
+    // Non-raising existence probe for the RTP-fallback path selection in Ruby
+    // (Cache.load_bitmap). Uses the SAME RMProjectPath.Resolve as new_filename so
+    // the check matches the loader path exactly. Raising RGSSError from a binding
+    // cannot be caught by Ruby `rescue` across the mruby-dotnet callback boundary,
+    // so the fallback decision must be made in Ruby BEFORE calling Bitmap.new.
+    [RbClassMethod("file_exists?")]
+    public static RbValue FileExists(RbState state, RbValue self, RbValue filename)
+    {
+        var relativePath = filename.ToStringUnchecked()!;
+        var path = RMProjectPath.Resolve(relativePath);
+        return File.Exists(path).ToValue(state);
+    }
+
     [RbInstanceMethod("dispose")]
     public static RbValue Dispose(RbState state, RbValue self)
     {
