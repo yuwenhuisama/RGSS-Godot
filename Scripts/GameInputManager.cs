@@ -2,13 +2,18 @@ using Godot;
 
 namespace RGSSUnity
 {
-    // Polls Godot's InputMap each _Process and feeds InputStateRecorder.
-    // 20 RGSS actions mapped from RGSSInput.inputactions keyboard bindings.
-    public partial class GameInputManager : Node
+    // Single source of truth for the RGSS action/key bindings, used by
+    // GameManager.RegisterInputActions (to populate Godot's InputMap) and by
+    // InputStateRecorder.Update (to poll held action state each frame).
+    //
+    // Input polling itself lives in InputStateRecorder.Update, which is driven once per
+    // frame by Ruby's Input.update (RMVA Scene_Base#update_basic). Polling there -- rather
+    // than in a separate node's _Process -- guarantees the press is observed in the same
+    // frame the scene reads it (Godot runs a parent's _Process before its children, so a
+    // child poll would land one frame late).
+    public static class GameInputManager
     {
         // (recorder_key, godot_action_name, primary_keycode)
-        // GameManager.RegisterInputActions uses this as the single source of truth
-        // for both registration and polling.
         internal static readonly (InputStateRecorder.InputKey recorderKey, string action, Key keycode)[] ActionTable =
         {
             (InputStateRecorder.InputKey.DOWN,  "rgss_down",  Key.Down),
@@ -32,18 +37,5 @@ namespace RGSSUnity
             (InputStateRecorder.InputKey.F8,    "rgss_f8",    Key.F8),
             (InputStateRecorder.InputKey.F9,    "rgss_f9",    Key.F9),
         };
-
-        public override void _Process(double delta)
-        {
-            var recorder = InputStateRecorder.Instance;
-            foreach (var (recKey, action, _) in ActionTable)
-            {
-                if (!InputMap.HasAction(action)) continue;
-                if (Godot.Input.IsActionJustPressed(action))
-                    recorder.SetPress(recKey);
-                else if (Godot.Input.IsActionJustReleased(action))
-                    recorder.SetRelease(recKey);
-            }
-        }
     }
 }

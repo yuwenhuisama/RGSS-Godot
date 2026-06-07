@@ -20,12 +20,11 @@ public partial class GameManager : Node
             GameRenderManager.Instance.Initialize(this);
             GameAudioManager.Instance.Initialize(this);
 
-            // Input subsystem: allocate the double-buffered recorder, register the
-            // 20 RGSS actions in Godot's InputMap, and attach the per-frame poller
-            // as a child node. Mirrors the Unity boot order (render -> input -> ruby).
+            // Input subsystem: allocate the recorder and register the 20 RGSS actions in
+            // Godot's InputMap. The recorder polls held action state itself each frame
+            // (driven by Ruby's Input.update), so no separate poller node is needed.
             InputStateRecorder.Instance.Init();
             RegisterInputActions();
-            AddChild(new GameInputManager { Name = "GameInputManager" });
 
             RubyScriptManager.Instance.Initialize();
             GD.Print("SCRIPTS_LOADED:OK");
@@ -40,10 +39,10 @@ public partial class GameManager : Node
 
     public override void _Process(double delta)
     {
-        // Swap the input double-buffer BEFORE the fiber pump so Ruby reads a
-        // stable snapshot this frame (preserves the Unity frame ordering and the
-        // RMVA repeat cadence).
-        InputStateRecorder.Instance.Update();
+        // Input is driven by Ruby's Input.update (RMVA Scene_Base#update_basic) inside the
+        // fiber pump below, so the poll/compute/publish happens in the same frame the scene
+        // reads it. Do NOT advance the input recorder here -- a second advance per frame
+        // doubles the repeat cadence and destroys the first-press trigger snapshot.
         GameRenderManager.Instance.Update();
         UnityModule.Update();
         RGSSLogger.FlushPendingMessages();
