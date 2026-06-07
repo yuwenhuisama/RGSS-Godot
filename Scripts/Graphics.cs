@@ -8,16 +8,12 @@ namespace RGSSUnity.RubyClasses;
 [RbModule("Graphics", "Unity")]
 public static class Graphics
 {
-    public static int WaitCount { get; set; }
     public static bool Freezing { get; private set; }
 
     private static long frameCount;
 
     public static void Render()
     {
-        if (WaitCount > 0)
-            --WaitCount;
-
         ++frameCount;
     }
 
@@ -32,7 +28,11 @@ public static class Graphics
     [RbModuleMethod("wait")]
     private static RbValue Wait(RbState state, RbValue self, RbValue duration)
     {
-        WaitCount = Math.Max(0, (int)duration.ToIntUnchecked());
+        // No-op on the C# side: the cooperative frame barrier lives in the Ruby
+        // Graphics.update wrapper, and Graphics.wait is reimplemented Ruby-side as
+        // `n.times { update }`. Kept as a binding so any direct Unity::Graphics.wait
+        // call is harmless.
+        _ = duration;
         return state.RbNil;
     }
 
@@ -79,18 +79,20 @@ public static class Graphics
     [RbModuleMethod("fadeout")]
     private static RbValue FadeOut(RbState state, RbValue self, RbValue duration)
     {
+        // Start-only: kick off the brightness ramp to black. The Ruby Graphics.fadeout
+        // wrapper drives the per-frame waiting via `n.times { update }`; this side only
+        // owns the brightness animation state (advanced by GameRenderManager each frame).
         int frames = Math.Max(0, (int)duration.ToIntUnchecked());
         GameRenderManager.Instance.StartBrightnessFade(0.0f, frames);
-        WaitCount = frames;
         return state.RbNil;
     }
 
     [RbModuleMethod("fadein")]
     private static RbValue FadeIn(RbState state, RbValue self, RbValue duration)
     {
+        // Start-only (see fadeout). Ramp brightness to full; Ruby wrapper does the waiting.
         int frames = Math.Max(0, (int)duration.ToIntUnchecked());
         GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
-        WaitCount = frames;
         return state.RbNil;
     }
 
@@ -104,15 +106,14 @@ public static class Graphics
     [RbModuleMethod("transition")]
     private static RbValue Transition(RbState state, RbValue self, RbValue duration, RbValue filename, RbValue vague)
     {
-        // Phase 1: brightness-ramp transition. After a preceding fadeout the screen is
+        // Start-only brightness-ramp transition. After a preceding fadeout the screen is
         // black (brightness 0) and the new scene is already built, so ramping 0->1 fades
         // the new scene in from black. With no preceding fadeout (brightness already 1)
-        // this is an instant no-op, preserving current behavior for same-brightness
-        // (e.g. menu) changes. `filename`/`vague` (masked crossfade) are Phase 2.
+        // this is an instant no-op. The Ruby Graphics.transition wrapper drives the
+        // per-frame waiting. `filename`/`vague` (masked crossfade) are a future phase.
         Freezing = false;
         int frames = Math.Max(0, (int)duration.ToIntUnchecked());
         GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
-        WaitCount = frames;
         return state.RbNil;
     }
 

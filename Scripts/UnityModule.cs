@@ -26,12 +26,6 @@ public static class UnityModule
 
     public static void Update()
     {
-        if (Graphics.WaitCount > 0)
-        {
-            Graphics.Render();
-            return;
-        }
-
         if (UpdateFiber is not null && State.CheckFiberAlive(UpdateFiber).IsTrue)
         {
             bool error = false;

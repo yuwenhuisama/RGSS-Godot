@@ -6,7 +6,6 @@
 msgbox "Initialize RGSS3 scripts..."
 
 $rmva_project_base_path = Unity.rmva_project_path
-$rgss_stop_flag = false
 $rtp_path = Unity.rtp_path
 
 msgbox "RMVA project path: #{$rmva_project_base_path}"

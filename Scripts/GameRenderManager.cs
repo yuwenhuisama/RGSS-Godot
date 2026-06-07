@@ -1279,7 +1279,8 @@ void fragment() {
 
     // Advances the brightness ramp by one frame. Increment-first so that on frame
     // `fadeTotalFrames` the value reaches EXACTLY the target. Called once per engine
-    // frame from Update(), including while the Ruby fiber is parked (WaitCount>0).
+    // frame from Update(), independent of the Ruby fiber: the fade keeps animating
+    // while Ruby is parked in Graphics.wait/fadeout's `n.times { update }` loop.
     private void TickBrightnessFade()
     {
         if (!this.brightnessFadeActive)

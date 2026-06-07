@@ -19,76 +19,16 @@ module SceneManager
   end
 end
 
-class Scene_Base
-  def main
-    start
-    post_start
-    __yield_update until scene_changing?
-    pre_terminate
-    terminate
-  end
-
-  def __yield_update
-    if $rgss_stop_flag
-      Graphics.update
-    else
-      update
-    end
-    Fiber.yield
-  end
-end
-
-class Scene_Title
-  def close_command_window
-    @command_window.close
-    __yield_update until @command_window.close?
-  end
-end
-
-# Scene_Map drives its fade-in/out through fade_loop -> update_for_fade, which in
-# stock RGSS3 calls Graphics.update once per step (each Graphics.update is one frame
-# in the native runtime). In this port Graphics.update does NOT advance the frame /
-# yield the scene fiber, so without an explicit yield every fade_loop iteration runs
-# inside a single engine frame and the fade (e.g. New Game: black -> map) collapses
-# into one instant jump. Re-yield the fiber after each fade step so the brightness
-# ramp spreads across frames, mirroring the __yield_update pattern above.
-class Scene_Map
-  alias :old_update_for_fade :update_for_fade
-
-  def update_for_fade
-    old_update_for_fade
-    Fiber.yield
-  end
-end
-
-class Scene_End
-  def close_command_window
-    @command_window.close
-    __yield_update until @command_window.close?
-  end
-end
-
-class Scene_Battle
-  alias :old_update_for_wait :update_for_wait
-
-  def update_for_wait
-    old_update_for_wait
-    Fiber.yield
-  end
-
-  def process_event
-    until scene_changing?
-      $game_troop.interpreter.update
-      $game_troop.setup_battle_event
-      wait_for_message
-      wait_for_effect if $game_troop.all_dead?
-      process_forced_action
-      BattleManager.judge_win_loss
-      break unless $game_troop.interpreter.running?
-      update_for_wait
-    end
-  end
-end
+# NOTE: the cooperative frame barrier now lives in Graphics.update (RGSS/graphics.rb),
+# which calls Unity::Graphics.update then Fiber.yield. Because every RGSS3 frame loop
+# (Scene_Base#main's `update until scene_changing?`, Scene_Map fade_loop, Scene_Battle
+# wait helpers, rgss_stop, and third-party `loop { Graphics.update }`) ultimately calls
+# Graphics.update once per iteration, stock scene code runs unmodified at the correct
+# one-frame-per-iteration cadence. The previous per-callsite Fiber.yield patches
+# (Scene_Base#__yield_update, Scene_Title/Scene_End#close_command_window,
+# Scene_Map#update_for_fade, Scene_Battle#update_for_wait/process_event) are no longer
+# needed and have been removed to avoid double-yielding (which would halve the frame
+# rate).
 
 module DataManager
   def self.__get_real_path__(*path)

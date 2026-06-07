@@ -5,7 +5,11 @@ module Kernel
   end
 
   def rgss_stop
-    $rgss_stop_flag = true
+    # Native RGSS3 semantics: idle forever, advancing one frame per iteration, until
+    # an RGSSReset (F12) is raised. Graphics.update is the cooperative frame barrier
+    # (it yields the scene fiber back to the per-frame pump), so this loop is a proper
+    # one-yield-per-frame idle rather than a busy spin.
+    loop { Graphics.update }
   end
 
   def load_data(filename)
