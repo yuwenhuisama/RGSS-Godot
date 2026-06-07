@@ -266,7 +266,7 @@ public static class Sprite
     [RbInstanceMethod("x=")]
     public static RbValue SetX(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<SpriteData>().X = (int)value.ToIntUnchecked();
+        self.GetRDataObject<SpriteData>().X = value.IsFloat ? (int)value.ToFloatUnchecked() : (int)value.ToIntUnchecked();
         return state.RbNil;
     }
 
@@ -276,7 +276,7 @@ public static class Sprite
     [RbInstanceMethod("y=")]
     public static RbValue SetY(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<SpriteData>().Y = (int)value.ToIntUnchecked();
+        self.GetRDataObject<SpriteData>().Y = value.IsFloat ? (int)value.ToFloatUnchecked() : (int)value.ToIntUnchecked();
         return state.RbNil;
     }
 
