@@ -46,3 +46,8 @@ mruby-ext/**/*.pdb
 # Godot UID sidecars for vendored DotZLib C# (excluded from compile in
 # RGSS-Godot.csproj, so these are editor-generated noise, not project assets).
 mruby-ext/**/*.cs.uid
+
+# Decompiled RMVA game scripts (local debug aid produced by tools/extract_scripts.py
+# from the copyrighted Scripts.rvdata2). Game content is not tracked here, same as
+# RMProject/ and *.rvdata2 — regenerate locally instead of committing.
+docs/rmva-scripts/
