@@ -1022,37 +1022,67 @@ public sealed class GameRenderManager : IDisposable
 
         var mapW = map.XSize;
         var mapH = map.YSize;
-        var layers = Math.Min(3, map.ZSize);   // render tile layers z=0,1,2 only
+        var hasShadowLayer = map.ZSize >= 4;
 
         for (var ty = 0; ty < tilesH; ty++)
         {
             var my = originTileY + ty;
-            if (my < 0 || my >= mapH)
-                continue;
             for (var tx = 0; tx < tilesW; tx++)
             {
                 var mx = originTileX + tx;
-                if (mx < 0 || mx >= mapW)
-                    continue;
 
                 var px = tx * TilemapRenderer.TileSize;
                 var py = ty * TilemapRenderer.TileSize;
 
-                for (var z = 0; z < layers; z++)
-                {
-                    var tileId = GetMapTile(map, mx, my, z);
-                    if (tileId <= 0)
-                        continue;
+                // Wrap coordinates so loop maps show the opposite edge in the margin.
+                // For non-loop maps the camera clamps, so wrapped tiles stay off-screen
+                // (matches mkxp-z tableGetWrapped behaviour).
+                var wx = Wrap(mx, mapW);
+                var wy = Wrap(my, mapH);
+                if (wx < 0 || wy < 0)
+                    continue;
 
-                    var overPlayer = (GetTileFlag(data.Flags, tileId) & TilemapRenderer.OverPlayerFlag) != 0;
-                    var target = overPlayer ? overImg : groundImg;
-                    TilemapRenderer.DrawTile(target, px, py, tileId, data.Bitmaps, animA, animC);
+                // RGSS3 layer order: z=0, z=1, shadow (z=3), z=2 (so the top tile layer
+                // draws over shadows). Shadows go onto the ground image, below characters.
+                DrawMapTile(data, groundImg, overImg, map, wx, wy, 0, px, py, animA, animC);
+                DrawMapTile(data, groundImg, overImg, map, wx, wy, 1, px, py, animA, animC);
+                if (hasShadowLayer)
+                {
+                    var shadow = GetMapTile(map, wx, wy, 3) & 0xF;
+                    if (shadow != 0)
+                        TilemapRenderer.DrawShadow(groundImg, px, py, shadow);
                 }
+                DrawMapTile(data, groundImg, overImg, map, wx, wy, 2, px, py, animA, animC);
             }
         }
 
         ApplyLayerImage(ground, groundImg);
         ApplyLayerImage(over, overImg);
+    }
+
+    // Positive modulo wrap for loop-map tile reads. Returns -1 for a non-positive size.
+    private static int Wrap(int v, int size)
+    {
+        if (size <= 0)
+            return -1;
+        var m = v % size;
+        return m < 0 ? m + size : m;
+    }
+
+    // Draws one map cell's tile at layer z onto the correct (ground/over) image,
+    // honouring the over-player (0x10) and table (0x80) flags.
+    private static void DrawMapTile(
+        TilemapData data, Image groundImg, Image overImg, TableData map,
+        int wx, int wy, int z, int px, int py, int animA, int animC)
+    {
+        var tileId = GetMapTile(map, wx, wy, z);
+        if (tileId <= 0)
+            return;
+
+        var flag = GetTileFlag(data.Flags, tileId);
+        var target = (flag & TilemapRenderer.OverPlayerFlag) != 0 ? overImg : groundImg;
+        var isTable = (flag & TilemapRenderer.TableFlag) != 0;
+        TilemapRenderer.DrawTile(target, px, py, tileId, data.Bitmaps, animA, animC, isTable);
     }
 
     private static int GetMapTile(TableData map, int x, int y, int z)

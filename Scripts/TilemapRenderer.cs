@@ -23,6 +23,7 @@ internal static class TilemapRenderer
     private const int IdA4Max   = 0x2000;   // 8191
 
     public const int OverPlayerFlag = 0x10;
+    public const int TableFlag = 0x80;
 
     // Bitmap slot indices into TilemapData.Bitmaps.
     private const int BmA1 = 0, BmA2 = 1, BmA3 = 2, BmA4 = 3, BmA5 = 4, BmB = 5;
@@ -35,7 +36,7 @@ internal static class TilemapRenderer
 
     // ── Public entry: blend one tile id into dst at (px,py) ───────────────────────
     // Returns true if anything was drawn. animA/animC are 0..2 autotile animation frames.
-    public static bool DrawTile(Image dst, int px, int py, int tileId, BitmapData?[] bitmaps, int animA, int animC)
+    public static bool DrawTile(Image dst, int px, int py, int tileId, BitmapData?[] bitmaps, int animA, int animC, bool isTable = false)
     {
         if (tileId <= 0)
             return false;
@@ -47,13 +48,29 @@ internal static class TilemapRenderer
         if (tileId >= IdA1Base && tileId < IdA2Base)
             return DrawA1(dst, px, py, tileId, bitmaps, animA, animC);
         if (tileId >= IdA2Base && tileId < IdA3Base)
-            return DrawA2(dst, px, py, tileId, bitmaps);
+            return DrawA2(dst, px, py, tileId, bitmaps, isTable);
         if (tileId >= IdA3Base && tileId < IdA4Base)
             return DrawA3(dst, px, py, tileId, bitmaps);
         if (tileId >= IdA4Base && tileId < IdA4Max)
             return DrawA4(dst, px, py, tileId, bitmaps);
 
         return false;
+    }
+
+    // Shadow overlay: a 0x0..0xF nibble where each bit marks a 16x16 quadrant that gets a
+    // 50%-black overlay (mkxp-z: bit0=TL, bit1=TR, bit2=BL, bit3=BR; colour (0,0,0,128)).
+    public static void DrawShadow(Image dst, int px, int py, int shadow)
+    {
+        if (shadow == 0)
+            return;
+        for (var bit = 0; bit < 4; bit++)
+        {
+            if ((shadow & (1 << bit)) == 0)
+                continue;
+            var qx = (bit & 1) != 0 ? Half : 0;     // bit0/bit2 left, bit1/bit3 right
+            var qy = (bit & 2) != 0 ? Half : 0;     // bit0/bit1 top,  bit2/bit3 bottom
+            BlendShadowQuad(dst, px + qx, py + qy);
+        }
     }
 
     // ── Plain tiles ───────────────────────────────────────────────────────────────
@@ -133,7 +150,7 @@ internal static class TilemapRenderer
     }
 
     // A2 (ground): 32 slots, 8 cols x 4 rows, each slot 2x3 tiles.
-    private static bool DrawA2(Image dst, int px, int py, int id, BitmapData?[] bitmaps)
+    private static bool DrawA2(Image dst, int px, int py, int id, BitmapData?[] bitmaps, bool isTable)
     {
         id -= IdA2Base;
         var pattern = id % 48;
@@ -143,6 +160,8 @@ internal static class TilemapRenderer
             return false;
         var bx = (slot % 8) * 2;
         var by = (slot / 8) * 3;
+        if (isTable)
+            return DrawAutotileA2Table(dst, src, bx * TileSize, by * TileSize, pattern, px, py);
         return DrawAutotileA(dst, src, bx * TileSize, by * TileSize, pattern, px, py);
     }
 
@@ -210,6 +229,26 @@ internal static class TilemapRenderer
         return drew;
     }
 
+    // A2 table-tile: 6 sub-rects per shape (4 quarters + 2 optional table legs at +24px).
+    // Legs whose size entry is 0 are skipped (mkxp autotileVXRectsA2 / ...Sizes).
+    private static readonly Vector2I[] TableDst =
+    {
+        new(0, 0), new(Half, 0), new(0, Half), new(Half, Half), new(0, 24), new(Half, 24),
+    };
+
+    private static bool DrawAutotileA2Table(Image dst, BitmapData src, int originX, int originY, int pattern, int px, int py)
+    {
+        var drew = false;
+        for (var i = 0; i < 6; i++)
+        {
+            var r = AutotileTables.A2[pattern * 6 + i];
+            if (r.W == 0 || r.H == 0)        // size-0 sentinel -> leg absent for this shape
+                continue;
+            drew |= Blend(dst, src, originX + r.X, originY + r.Y, px + TableDst[i].X, py + TableDst[i].Y, Half, Half);
+        }
+        return drew;
+    }
+
     // Waterfall (A1 sub-type): 4 shapes x 2 half-columns (full tile height).
     private static bool DrawWaterfall(Image dst, BitmapData src, int oxTiles, int oyTiles, int pattern, int px, int py)
     {
@@ -255,5 +294,18 @@ internal static class TilemapRenderer
 
         dst.BlendRect(srcImg, clamped, new Vector2I(dstX, dstY));
         return true;
+    }
+
+    // A reusable 16x16 black-at-50%-alpha tile, lazily built, for shadow quadrants.
+    private static Image? _shadowQuad;
+
+    private static void BlendShadowQuad(Image dst, int dstX, int dstY)
+    {
+        if (_shadowQuad is null)
+        {
+            _shadowQuad = Image.CreateEmpty(Half, Half, false, Image.Format.Rgba8);
+            _shadowQuad.Fill(new Godot.Color(0f, 0f, 0f, 128f / 255f));
+        }
+        dst.BlendRect(_shadowQuad, new Rect2I(0, 0, Half, Half), new Vector2I(dstX, dstY));
     }
 }
