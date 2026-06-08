@@ -1,0 +1,16 @@
+[submodule "mruby-ext/marshal/mruby-marshal-c"]
+	path = mruby-ext/marshal/mruby-marshal-c
+	url = https://github.com/yuwenhuisama/mruby-marshal-c.git
+	branch = rgss-godot
+[submodule "mruby-ext/glob/mruby-dir-glob"]
+	path = mruby-ext/glob/mruby-dir-glob
+	url = https://github.com/yuwenhuisama/mruby-dir-glob.git
+	branch = rgss-godot
+[submodule "mruby-ext/regexp/mruby-onig-regexp"]
+	path = mruby-ext/regexp/mruby-onig-regexp
+	url = https://github.com/yuwenhuisama/mruby-onig-regexp.git
+	branch = rgss-godot
+[submodule "mruby-ext/zlib/mruby-zlib"]
+	path = mruby-ext/zlib/mruby-zlib
+	url = https://github.com/yuwenhuisama/mruby-zlib.git
+	branch = rgss-godot
