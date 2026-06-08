@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <zlib.h>
 
 #define WINDOW_BITS_DEFLATE 15
@@ -84,47 +85,79 @@ mrb_zlib_gzip(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_zlib_inflate(mrb_state *mrb, mrb_value self)
 {
-  mrb_value data, arg;
+  mrb_value arg;
   z_stream strm;
   int ret;
+
+  mrb_get_args(mrb, "S", &arg);
+
+  // Copy the compressed INPUT into a plain C buffer up front, and inflate into a
+  // separate C heap buffer, creating the mruby result String only once at the end.
+  //
+  // The previous implementation kept zlib's next_in = RSTRING_PTR(arg) and
+  // next_out = RSTRING_PTR(output) live ACROSS mrb_str_buf_new / mrb_str_resize
+  // calls inside the inflate loop. Those mruby allocations can trigger GC and
+  // move/realloc string storage, leaving zlib's raw pointers dangling. Under
+  // mruby 4.0.0's object-shape / GC changes this manifested as intermittent
+  // STATUS_HEAP_CORRUPTION and zlib Adler-checksum mismatches. Keeping every byte
+  // buffer in C memory for the duration of inflate removes mruby's GC from the
+  // hot path entirely.
+  size_t in_len = (size_t)RSTRING_LEN(arg);
+  unsigned char *in_buf = (unsigned char *)mrb_malloc(mrb, in_len > 0 ? in_len : 1);
+  memcpy(in_buf, RSTRING_PTR(arg), in_len);
 
   strm.zalloc = Z_NULL;
   strm.zfree  = Z_NULL;
   strm.opaque = Z_NULL;
-
-  mrb_get_args(mrb, "S", &arg);
-
-  strm.next_in = (Bytef *) RSTRING_PTR(arg);
-  strm.avail_in = RSTRING_LEN(arg);
+  strm.next_in = (Bytef *)in_buf;
+  strm.avail_in = (uInt)in_len;
 
   ret = inflateInit2(&strm, WINDOW_BITS_AUTO);
   if (ret != Z_OK) {
+    mrb_free(mrb, in_buf);
     mrb_zlib_raise(mrb, &strm, ret, NULL);
   }
 
-  data = mrb_str_buf_new(mrb, RSTRING_LEN(arg) * 2);
-  strm.next_out = (Bytef *) RSTRING_PTR(data);
-  strm.avail_out = RSTRING_CAPA(data);
+  size_t out_cap = (in_len > 0 ? in_len : 1) * 2;
+  size_t out_len = 0;
+  unsigned char *out_buf = (unsigned char *)mrb_malloc(mrb, out_cap);
 
-  while (1) {
+  for (;;) {
+    if (out_cap - out_len < 64) {
+      size_t new_cap = out_cap * 2;
+      out_buf = (unsigned char *)mrb_realloc(mrb, out_buf, new_cap);
+      out_cap = new_cap;
+    }
+
+    strm.next_out = (Bytef *)(out_buf + out_len);
+    strm.avail_out = (uInt)(out_cap - out_len);
+
     ret = inflate(&strm, Z_NO_FLUSH);
-    if (ret == Z_OK) {
-      data = mrb_str_resize(mrb, data, RSTRING_CAPA(data) * 2);
-      strm.next_out = (Bytef *) RSTRING_PTR(data) + strm.total_out;
-      strm.avail_out = RSTRING_CAPA(data) - strm.total_out;
-    } else if (ret == Z_STREAM_END) {
-      data = mrb_str_resize(mrb, data, strm.total_out);
-      ret = inflateEnd(&strm);
-      if (ret != Z_OK) {
-        mrb_zlib_raise(mrb, &strm, ret, NULL);
-      }
+    out_len = (size_t)strm.total_out;
+
+    if (ret == Z_STREAM_END) {
       break;
-    } else {
-      mrb_zlib_raise(mrb, &strm, ret, inflateEnd);
+    }
+    if (ret != Z_OK && ret != Z_BUF_ERROR) {
+      char msg[256];
+      snprintf(msg, sizeof(msg), "zlib error (%d): %s", ret, strm.msg ? strm.msg : "");
+      inflateEnd(&strm);
+      mrb_free(mrb, in_buf);
+      mrb_free(mrb, out_buf);
+      mrb_raise(mrb, E_RUNTIME_ERROR, msg);
+    }
+    if (ret == Z_BUF_ERROR && strm.avail_in == 0) {
+      // Truncated stream: no more input but not at stream end.
+      break;
     }
   }
 
-  return data;
+  inflateEnd(&strm);
+  mrb_free(mrb, in_buf);
+
+  mrb_value result = mrb_str_new(mrb, (const char *)out_buf, out_len);
+  mrb_free(mrb, out_buf);
+  return result;
 }
 
 static mrb_value

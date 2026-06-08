@@ -14,7 +14,7 @@ function common_settings()
     add_files(gem_name .. "/src/*.c")
     add_files("./zlib-1.3.1/*.c")
 
-    add_defines("MRB_INT64", "MRB_NO_PRESYM", "MRB_UTF8_STRING")
+    add_defines("MRB_INT64", "MRB_UTF8_STRING")
 
     -- zlib's gzread.c/gzlib.c use POSIX read()/close(); zconf.h only pulls in
     -- <unistd.h> when HAVE_UNISTD_H is defined (normally set by zlib's

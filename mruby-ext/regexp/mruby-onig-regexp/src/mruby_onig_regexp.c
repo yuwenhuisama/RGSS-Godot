@@ -1127,7 +1127,7 @@ mrb_mruby_onig_regexp_gem_init(mrb_state* mrb) {
   struct RClass *clazz;
 
   clazz = mrb_define_class(mrb, "OnigRegexp", mrb->object_class);
-  MRB_SET_INSTANCE_TT(clazz, MRB_TT_DATA);
+  MRB_SET_INSTANCE_TT(clazz, MRB_TT_CDATA);
 
   // enable global variables setting in onig_match_common by default
   mrb_obj_iv_set(mrb, (struct RObject*)clazz, mrb_intern_lit(mrb, "@set_global_variables"), mrb_true_value());
@@ -1183,7 +1183,12 @@ mrb_mruby_onig_regexp_gem_init(mrb_state* mrb) {
   mrb_define_module_function(mrb, clazz, "clear_global_variables", onig_regexp_clear_global_variables, MRB_ARGS_NONE());
 
   struct RClass* match_data = mrb_define_class(mrb, "OnigMatchData", mrb->object_class);
-  MRB_SET_INSTANCE_TT(clazz, MRB_TT_DATA);
+  // Set the instance type-tag on OnigMatchData itself (was a copy-paste bug that set
+  // it on `clazz`/OnigRegexp). mruby 4.0.0 strictly requires a class's instance_tt to
+  // be MRB_TT_CDATA before mrb_data_object_alloc on it; without this, creating an
+  // OnigMatchData (every successful regexp match) raises "allocation failure of
+  // OnigMatchData". MRB_TT_DATA is an obsolete alias for MRB_TT_CDATA in 4.0.0.
+  MRB_SET_INSTANCE_TT(match_data, MRB_TT_CDATA);
   mrb_undef_class_method(mrb, match_data, "new");
 
   // mrb_define_method(mrb, match_data, "==", &match_data_eq);

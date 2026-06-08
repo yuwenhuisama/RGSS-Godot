@@ -81,7 +81,7 @@ function common_settings()
     add_includedirs("Onigmo/")
     add_files(gem_name .. "/src/*.c")
 
-    add_defines("MRB_INT64", "MRB_NO_PRESYM", "MRB_UTF8_STRING")
+    add_defines("MRB_INT64", "MRB_UTF8_STRING")
     add_defines("HAVE_ONIGMO_H")
 
     add_host_mruby_link()
