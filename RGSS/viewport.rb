@@ -10,6 +10,10 @@ class Viewport
     if args.size == 0
       @__handler__ = Unity::Viewport.new_without_rect
     elsif args.size == 1
+      if args[0].is_a? Unity::Viewport
+        @__handler__, = args
+        return
+      end
       check_arguments(args, [Rect])
       rect, = args
       @__handler__ = Unity::Viewport.new_xyrw(rect.x, rect.y, rect.w, rect.h)
@@ -86,7 +90,7 @@ class Viewport
   [:z, :ox, :oy].each do |prop|
     define_method(prop) { @__handler__.send(prop) }
     define_method("#{prop}=") do |value|
-      check_type(value, Integer)
+      check_type(value, [Integer, Float])
       @__handler__.send("#{prop}=", value)
     end
   end
