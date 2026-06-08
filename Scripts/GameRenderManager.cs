@@ -212,7 +212,23 @@ public sealed class GameRenderManager : IDisposable
                 continue;
 
             entry.Wrapper.ZIndex = viewportData.Z;
-            entry.Wrapper.Position = new Vector2(-viewportData.Ox, -viewportData.Oy);
+            // Apply the RGSS Viewport geometry: rect.(x,y) positions the clipped region on
+            // screen, rect.(w,h) is the hard clip (the SubViewport renders only that area),
+            // and ox/oy scrolls the contents inside it. For the default full-screen viewport
+            // (0,0,544,416) with ox=oy=0 this reduces to the previous behaviour exactly.
+            var rectWidth = Math.Max(1, viewportData.Width);
+            var rectHeight = Math.Max(1, viewportData.Height);
+            var desiredSize = new Vector2I(rectWidth, rectHeight);
+            if (entry.SubViewport.Size != desiredSize)
+            {
+                entry.SubViewport.Size = desiredSize;
+                // Re-fetch the texture: a SubViewport hands out a new ViewportTexture when
+                // its size changes.
+                entry.Wrapper.Texture = entry.SubViewport.GetTexture();
+            }
+            entry.Wrapper.Position = new Vector2(viewportData.X, viewportData.Y);
+            entry.SubViewportRoot.Position = new Vector2(-viewportData.Ox, -viewportData.Oy);
+            entry.Wrapper.Visible = viewportData.Visible && rectWidth > 0 && rectHeight > 0;
 
             foreach (var child in entry.SubViewportRoot.GetChildren())
             {
@@ -241,11 +257,12 @@ public sealed class GameRenderManager : IDisposable
             return;
         }
 
-        var renderSize = GetRenderSize();
+        var initialWidth = Math.Max(1, data.Width);
+        var initialHeight = Math.Max(1, data.Height);
         var subViewport = new SubViewport
         {
             Name = $"RmvaSubViewport_{this.viewports.Count}",
-            Size = new Vector2I((int)renderSize.X, (int)renderSize.Y),
+            Size = new Vector2I(initialWidth, initialHeight),
             TransparentBg = true,
             RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
         };
@@ -263,7 +280,7 @@ public sealed class GameRenderManager : IDisposable
             Texture = subViewport.GetTexture(),
             Centered = false,
             FlipV = false,
-            Position = Vector2.Zero,
+            Position = new Vector2(data.X, data.Y),
             ZAsRelative = false,
             ZIndex = data.Z,
         };

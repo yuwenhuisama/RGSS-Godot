@@ -45,13 +45,25 @@ namespace RGSSUnity.RubyClasses
         [RbInstanceMethod("rect")]
         public static RbValue GetRect(RbState state, RbValue self)
         {
+            // Return the SAME persistent Rect wrapper that backs ViewportData so RGSS3
+            // in-place mutation (`viewport.rect.y = N`, used by Scene_Battle's
+            // create_info_viewport) writes through to the viewport's geometry.
+            var stored = self["@rect"];
+            if (!stored.IsNil)
+                return stored;
+
             var d = self.GetRDataObject<ViewportData>();
-            return Rect.CreateRect(state, d.X, d.Y, d.Width, d.Height);
+            var rectObj = Rect.CreateRect(state, d.X, d.Y, d.Width, d.Height);
+            d.Rect = rectObj.GetRDataObject<RectData>();
+            self["@rect"] = rectObj;
+            return rectObj;
         }
 
         [RbInstanceMethod("rect=")]
         public static RbValue SetRect(RbState state, RbValue self, RbValue rect)
         {
+            // Copy values into the live backing RectData; never replace it, so any Rect
+            // reference the script already holds from `viewport.rect` stays connected.
             var d = self.GetRDataObject<ViewportData>();
             var rd = rect.GetRDataObject<RectData>();
             d.X = rd.X; d.Y = rd.Y; d.Width = rd.Width; d.Height = rd.Height;
@@ -191,11 +203,13 @@ namespace RGSSUnity.RubyClasses
         {
             var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
             var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
+            // The viewport's rect lives in a persistent Rect wrapper so the Ruby side can
+            // mutate it in place (`viewport.rect.y = N`); ViewportData.X/Y/Width/Height
+            // forward to this same RectData.
+            var rectObj = Rect.CreateRect(state, x, y, System.Math.Max(1, w), System.Math.Max(1, h));
             var data = new ViewportData(state)
             {
-                X = x, Y = y,
-                Width = System.Math.Max(1, w),
-                Height = System.Math.Max(1, h),
+                Rect = rectObj.GetRDataObject<RectData>(),
                 Z = 0,
                 Visible = true,
                 Tone = toneObj.GetRDataObject<ToneData>(),
@@ -207,6 +221,7 @@ namespace RGSSUnity.RubyClasses
             var obj = cls.NewObjectWithRData(data);
             obj["@tone"] = toneObj;
             obj["@color"] = colorObj;
+            obj["@rect"] = rectObj;
             return obj;
         }
     }
