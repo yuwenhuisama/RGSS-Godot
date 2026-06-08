@@ -250,3 +250,28 @@ class Game_Interpreter
     end
   end
 end
+
+# ----------------------------------------------------------------------------
+# mruby sort! requires an Integer comparator result
+# ----------------------------------------------------------------------------
+# Our host mruby's native Array#sort!/#sort raises
+#   ArgumentError: comparison failed (element N and M)
+# when the comparator block returns a Float (it requires an Integer, like the
+# `<=>` contract). MRI/CRuby (real RGSS3) tolerates a Float difference, so stock
+# RMVA's `make_action_orders` uses `{|a,b| b.speed - a.speed }`.
+#
+# battler.speed is a Float here: Game_Action#speed adds Game_Battler#atk_speed,
+# which is `features_sum_all(...)` -> `inject(0.0) {...}` -> Float. So the
+# subtraction yields a Float and the native sort rejects it.
+#
+# Fix: compare with `<=>` (returns -1/0/+1, an Integer) while keeping the
+# descending-by-speed order (b <=> a). Ordering is identical to `b.speed - a.speed`.
+module BattleManager
+  def self.make_action_orders
+    @action_battlers = []
+    @action_battlers += $game_party.members unless @surprise
+    @action_battlers += $game_troop.members unless @preemptive
+    @action_battlers.each {|battler| battler.make_speed }
+    @action_battlers.sort! {|a, b| b.speed <=> a.speed }
+  end
+end
