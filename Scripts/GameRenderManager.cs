@@ -722,7 +722,13 @@ public sealed class GameRenderManager : IDisposable
         contents.Texture = hasContents ? data.Contents!.Texture : null;
         contents.Position = new Vector2(data.Padding - data.Ox, data.Padding - data.Oy);
         contents.ZIndex = data.Z + 3;
-        contents.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.ContentsOpacity) * windowOpacity);
+        // Contents (text/icons) alpha is driven SOLELY by contents_opacity, never by the
+        // window's `opacity`. In RGSS3 (and mkxp/mkxp-z) `opacity` only fades the windowskin
+        // background+frame (the `base` quad); the contents quad is a separate object whose
+        // vertex alpha is contents_opacity alone. This is what makes Window_BattleLog work:
+        // it sets `self.opacity = 0` (using a separate back-sprite for its dark band) while
+        // keeping contents_opacity = 255 so the battle-log TEXT stays fully visible.
+        contents.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.ContentsOpacity));
 
         if (contents.Material is ShaderMaterial contentsMaterial && hasContents)
         {
