@@ -252,26 +252,47 @@ class Game_Interpreter
 end
 
 # ----------------------------------------------------------------------------
-# mruby sort! requires an Integer comparator result
+# MRI-compatible Array#sort / #sort! comparator semantics
 # ----------------------------------------------------------------------------
-# Our host mruby's native Array#sort!/#sort raises
+# Our host mruby's native Array#sort!/#sort require the comparator block to
+# return an Integer; a Float result raises
 #   ArgumentError: comparison failed (element N and M)
-# when the comparator block returns a Float (it requires an Integer, like the
-# `<=>` contract). MRI/CRuby (real RGSS3) tolerates a Float difference, so stock
-# RMVA's `make_action_orders` uses `{|a,b| b.speed - a.speed }`.
+# MRI/CRuby (which real RGSS3 targets) instead routes the comparator result
+# through rb_cmpint, which only inspects the SIGN (`> 0` / `< 0`), so Float,
+# Integer and Bignum results are all valid and only nil is rejected. Stock RMVA
+# relies on this, e.g. BattleManager#make_action_orders does
+#   @action_battlers.sort! {|a, b| b.speed - a.speed }
+# where speed is a Float (Game_Action#speed adds atk_speed, itself a
+# features_sum_all -> inject(0.0) Float), which crashes on the native sort.
 #
-# battler.speed is a Float here: Game_Action#speed adds Game_Battler#atk_speed,
-# which is `features_sum_all(...)` -> `inject(0.0) {...}` -> Float. So the
-# subtraction yields a Float and the native sort rejects it.
-#
-# Fix: compare with `<=>` (returns -1/0/+1, an Integer) while keeping the
-# descending-by-speed order (b <=> a). Ordering is identical to `b.speed - a.speed`.
-module BattleManager
-  def self.make_action_orders
-    @action_battlers = []
-    @action_battlers += $game_party.members unless @surprise
-    @action_battlers += $game_troop.members unless @preemptive
-    @action_battlers.each {|battler| battler.make_speed }
-    @action_battlers.sort! {|a, b| b.speed <=> a.speed }
+# Restore MRI semantics at the primitive so stock RMVA (and any custom game
+# script using a difference comparator) works unchanged: coerce the block's
+# result to -1/0/+1 by sign before handing it to the native sort. This mirrors
+# rb_cmpint exactly -- including treating Float::NAN as 0 (a `<=> 0` coercion
+# would wrongly map NaN to nil and raise), while a genuine nil still raises like
+# MRI. Only sort/sort! need this; min/max/minmax and *_by compare with `<=>`/`>`
+# directly and already tolerate Floats (verified).
+class Array
+  unless method_defined?(:__rgss_mri_sort_bang__)
+    alias_method :__rgss_mri_sort_bang__, :sort!
+    alias_method :__rgss_mri_sort__, :sort
+  end
+
+  # rb_cmpint equivalent: reduce a comparator result to its sign as an Integer.
+  def __rgss_mri_cmpint__(v)
+    return nil if v.nil?
+    return 1 if v > 0
+    return -1 if v < 0
+    0
+  end
+
+  def sort!(&block)
+    return __rgss_mri_sort_bang__ unless block
+    __rgss_mri_sort_bang__ {|a, b| __rgss_mri_cmpint__(block.call(a, b)) }
+  end
+
+  def sort(&block)
+    return __rgss_mri_sort__ unless block
+    __rgss_mri_sort__ {|a, b| __rgss_mri_cmpint__(block.call(a, b)) }
   end
 end
