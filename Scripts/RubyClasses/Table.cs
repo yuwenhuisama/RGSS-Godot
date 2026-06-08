@@ -103,11 +103,16 @@ namespace RGSSUnity.RubyClasses
             var tableData = self.GetRDataObject<TableData>();
             var unboxedX = (int)x.ToIntUnchecked();
             var unboxedY = (int)y.ToIntUnchecked();
-            var index = unboxedX + unboxedY * tableData.XSize;
-            if (index < 0 || index >= tableData.Data.Length)
+            // Bounds-check each dimension independently (RGSS3 semantics, per mkxp/mkxp-z):
+            // an index that exceeds its own axis size must return nil, NOT silently roll
+            // over into the next row via the flat index. e.g. on Table.new(1, 8) the read
+            // t[1, 0] must be nil even though the flat index 1 lands inside the buffer.
+            if (unboxedX < 0 || unboxedX >= tableData.XSize ||
+                unboxedY < 0 || unboxedY >= tableData.YSize)
             {
                 return state.RbNil;
             }
+            var index = unboxedX + unboxedY * tableData.XSize;
 
             var data = tableData.Data[index];
             return data.ToValue(state);
@@ -121,12 +126,17 @@ namespace RGSSUnity.RubyClasses
             var unboxedY = (int)y.ToIntUnchecked();
             var unboxedZ = (int)z.ToIntUnchecked();
 
-            var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
-
-            if (index < 0 || index >= tableData.Data.Length)
+            // Per-dimension bounds check (RGSS3 semantics, per mkxp/mkxp-z): any axis
+            // index outside its own size returns nil rather than rolling over via the
+            // flat index into a neighbouring row/layer.
+            if (unboxedX < 0 || unboxedX >= tableData.XSize ||
+                unboxedY < 0 || unboxedY >= tableData.YSize ||
+                unboxedZ < 0 || unboxedZ >= tableData.ZSize)
             {
                 return state.RbNil;
             }
+
+            var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
 
             var data = tableData.Data[index];
             return data.ToValue(state);
@@ -151,11 +161,14 @@ namespace RGSSUnity.RubyClasses
             var tableData = self.GetRDataObject<TableData>();
             var unboxedX = (int)x.ToIntUnchecked();
             var unboxedY = (int)y.ToIntUnchecked();
-            var index = unboxedX + unboxedY * tableData.XSize;
-            if (index < 0 || index >= tableData.Data.Length)
+            // Per-dimension bounds check (RGSS3 semantics): an out-of-range write on any
+            // axis is a silent no-op, never a roll-over into the next row.
+            if (unboxedX < 0 || unboxedX >= tableData.XSize ||
+                unboxedY < 0 || unboxedY >= tableData.YSize)
             {
                 return state.RbNil;
             }
+            var index = unboxedX + unboxedY * tableData.XSize;
             tableData.Data[index] = (short)(long)value.ToIntUnchecked();
             return state.RbNil;
         }
@@ -167,11 +180,15 @@ namespace RGSSUnity.RubyClasses
             var unboxedX = (int)x.ToIntUnchecked();
             var unboxedY = (int)y.ToIntUnchecked();
             var unboxedZ = (int)z.ToIntUnchecked();
-            var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
-            if (index < 0 || index >= tableData.Data.Length)
+            // Per-dimension bounds check (RGSS3 semantics): out-of-range write is a
+            // silent no-op on any axis.
+            if (unboxedX < 0 || unboxedX >= tableData.XSize ||
+                unboxedY < 0 || unboxedY >= tableData.YSize ||
+                unboxedZ < 0 || unboxedZ >= tableData.ZSize)
             {
                 return state.RbNil;
             }
+            var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
             tableData.Data[index] = (short)(long)value.ToIntUnchecked();
             return state.RbNil;
         }
