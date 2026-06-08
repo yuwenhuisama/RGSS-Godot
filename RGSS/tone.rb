@@ -12,7 +12,7 @@ class Tone
     elsif args.size == 1
       check_arguments(args, [Unity::Tone])
       tone, = args
-      @__handler__, = tone
+      @__handler__ = tone
     elsif args.size == 3
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b = args

@@ -12,7 +12,7 @@ class Color
     elsif args.size == 1
       check_arguments(args, [Unity::Color])
       c, = args
-      @__handler__, = c
+      @__handler__ = c
     elsif args.size == 3
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b = args
