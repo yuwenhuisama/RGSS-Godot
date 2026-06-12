@@ -8,8 +8,6 @@ using MRuby.Library.Mapper;
 
 namespace RGSSGodot;
 
-class KernelKeeperCategory { }
-
 public static class Kernel
 {
     private static readonly HashSet<string> RequiredPath = new();
@@ -21,19 +19,13 @@ public static class Kernel
         var stat = mgr.State;
         var kernel = stat.GetModule("Kernel");
 
-        var keeper = RbNativeObjectLiveKeeper<KernelKeeperCategory, NativeMethodFunc>.GetOrCreateKeeper(stat);
-
-        kernel.DefineModuleMethod("require", Require, RbHelper.MRB_ARGS_REQ(1), out var func);
-        keeper.Keep(func);
-
-        kernel.DefineModuleMethod("msgbox", MsgBox, RbHelper.MRB_ARGS_ANY(), out func);
-        keeper.Keep(func);
-
-        kernel.DefineModuleMethod("p", Print, RbHelper.MRB_ARGS_ANY(), out func);
-        keeper.Keep(func);
-
-        kernel.DefineModuleMethod("print", Print, RbHelper.MRB_ARGS_ANY(), out func);
-        keeper.Keep(func);
+        // MRuby.Library >= 0.2.0 installs a static native trampoline and roots the
+        // managed callback internally (per-state callbackId map), so the define
+        // methods no longer return a NativeMethodFunc to keep alive.
+        kernel.DefineModuleMethod("require", Require, RbHelper.MRB_ARGS_REQ(1));
+        kernel.DefineModuleMethod("msgbox", MsgBox, RbHelper.MRB_ARGS_ANY());
+        kernel.DefineModuleMethod("p", Print, RbHelper.MRB_ARGS_ANY());
+        kernel.DefineModuleMethod("print", Print, RbHelper.MRB_ARGS_ANY());
     }
 
     public static bool IsScriptLoaded(string path) => RequiredPath.Contains(path);

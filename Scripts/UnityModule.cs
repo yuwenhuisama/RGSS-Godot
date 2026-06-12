@@ -29,8 +29,7 @@ public static class UnityModule
         if (UpdateFiber is not null && State.CheckFiberAlive(UpdateFiber).IsTrue)
         {
             bool error = false;
-            var res = State.Protect((_, _, _) => State.FiberResume(UpdateFiber), ref error, out var func);
-            GC.KeepAlive(func);
+            var res = State.Protect((_, _, _) => State.FiberResume(UpdateFiber), ref error);
 
             if (error)
             {

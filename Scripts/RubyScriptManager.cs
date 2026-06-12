@@ -165,8 +165,7 @@ public class RubyScriptManager
         // inside mruby and rendered them as mojibake. Keep the package at >= 0.1.8.
         var result = this.State.Protect(
             (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
-            ref error, out var func);
-        GC.KeepAlive(func);
+            ref error);
 
         if (error)
             GD.PrintErr($"Error in RMVA script {fileName}: {SafeClassName(result)}");
@@ -198,8 +197,7 @@ public class RubyScriptManager
 
         var result = this.State.Protect(
             (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
-            ref error, out var func);
-        GC.KeepAlive(func);
+            ref error);
 
         if (error)
             GD.PrintErr($"Error in script {fileName}: {SafeClassName(result)}");

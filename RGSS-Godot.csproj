@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <!--
-      ExcludeAssets="contentFiles": MRuby.Library 0.1.9 ships its own prebuilt
+      ExcludeAssets="contentFiles": MRuby.Library 0.2.0 ships its own prebuilt
       native libmruby_x64.{dll,so,dylib} as copyToOutput contentFiles. We build and
       ship our OWN libmruby_x64 (+ the 4 ext gems) in Plugins/<os>/ from the pinned
       mruby-for-dotnet fork, and the ext gems are import-linked against THAT build.
@@ -26,7 +26,7 @@
       (STATUS_HEAP_CORRUPTION) and zlib Adler mismatches. Exclude it so Plugins/ is
       the single authoritative native libmruby.
     -->
-    <PackageReference Include="MRuby.Library" Version="0.1.9" ExcludeAssets="contentFiles" />
+    <PackageReference Include="MRuby.Library" Version="0.2.0" ExcludeAssets="contentFiles" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <TrimmerRootAssembly Include="RGSS-Godot" />
   </ItemGroup>

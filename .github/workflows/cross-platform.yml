@@ -37,11 +37,12 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          # Pin the fork to the v0.1.9 tag (mruby 4.0.0) so the native VM version
-          # matches the MRuby.Library 0.1.9 managed binding (ABI-coupled) and the
-          # build is not silently broken by future upstream changes to the default
-          # branch.
-          git clone --branch v0.1.9 --depth 1 https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
+          # Pin the fork to the v0.2.0 tag (mruby 4.0.0 + the mrbdotnet_* callback
+          # trampoline) so the native VM matches the MRuby.Library 0.2.0 managed
+          # binding (ABI-coupled: 0.2.0 P/Invokes the new mrbdotnet_* host exports)
+          # and the build is not silently broken by future upstream default-branch
+          # changes.
+          git clone --branch v0.2.0 --depth 1 https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
           cd mruby-for-dotnet
           git submodule update --init --recursive
           # Build the universal (x86_64+arm64) mruby host lib WITHOUT running
@@ -258,10 +259,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          # Pin the fork to the v0.1.9 tag (mruby 4.0.0) to match the MRuby.Library
-          # 0.1.9 managed binding (ABI-coupled) and avoid breakage from upstream
-          # default-branch changes.
-          git clone --branch v0.1.9 --depth 1 https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
+          # Pin the fork to the v0.2.0 tag (mruby 4.0.0 + the mrbdotnet_* callback
+          # trampoline) to match the MRuby.Library 0.2.0 managed binding (ABI-coupled:
+          # 0.2.0 P/Invokes the new mrbdotnet_* host exports) and avoid breakage from
+          # upstream default-branch changes.
+          git clone --branch v0.2.0 --depth 1 https://github.com/Little-Princess-Studio/mruby-for-dotnet.git
           cd mruby-for-dotnet
           git submodule update --init --recursive
           chmod +x ./build-mruby-linux.sh

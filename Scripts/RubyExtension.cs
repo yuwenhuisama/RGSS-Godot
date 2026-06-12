@@ -8,16 +8,11 @@ namespace RGSSUnity.RubyClasses
         public static RbValue NewObjectWithRData<T>(this RbClass cls, T data, params RbValue[] args)
             where T : RubyData
         {
-            var obj = cls.NewObjectWithCSharpDataObject(RubyData.RDataName, data, Release, args);
+            // MRuby.Library >= 0.2.0 strong-roots the C# data object itself (GCHandle.Alloc
+            // inside NewObjectWithCSharpDataObject) and tracks it in a per-state registry it
+            // drains on Ruby.Close. No manual keeper is needed to keep `data` alive anymore.
+            var obj = cls.NewObjectWithCSharpDataObject(RubyData.RDataName, data, args);
             return obj;
-        }
-
-        private static void Release(RbState state, object obj)
-        {
-            var rdata = (obj as RubyData)!;
-            RbNativeObjectLiveKeeper<RubyData, RubyData>
-                .GetOrCreateKeeper(state)
-                .Release(rdata);
         }
     }
 
@@ -37,9 +32,8 @@ namespace RGSSUnity.RubyClasses
 
         protected RubyData(RbState state)
         {
-            RbNativeObjectLiveKeeper<RubyData, RubyData>
-                .GetOrCreateKeeper(state)
-                .Keep(this);
+            // No manual GC-rooting needed: MRuby.Library >= 0.2.0 roots the data object via
+            // GCHandle in NewObjectWithCSharpDataObject for the lifetime of the native object.
         }
     }
 
