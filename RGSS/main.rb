@@ -45,6 +45,18 @@ def run_scripts
 end
 
 begin
+  # RGSS3 evaluates skill/item damage formulas (e.g. "a.atk * 4 - b.def * 2") via an
+  # explicit-receiver Kernel.eval(@formula) in RPG::UsableItem::Damage#eval (the explicit
+  # `Kernel.` is needed there to avoid recursing into that wrapper's own #eval). mruby
+  # 4.0.0's mruby-eval gem registers Kernel#eval as a PRIVATE method, so the explicit
+  # receiver raises NoMethodError, which the formula's trailing `rescue 0` silently
+  # swallows -> every attack deals 0 damage. mruby 3.3.0 (and MRI) expose it as a
+  # module_function (public singleton method too). module_function re-publishes the
+  # SAME existing eval method entry (it does not wrap it), so the caller-frame binding
+  # that makes the formula's a/b/v locals visible is preserved. Must run before any
+  # RGSS/RMVA script that could evaluate a formula.
+  module Kernel; module_function :eval; end
+
   require 'kernel'
   require 'tone'
   require 'rect'
