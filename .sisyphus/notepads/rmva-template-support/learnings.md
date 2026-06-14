@@ -77,3 +77,10 @@
 - roundtrip.rb: PASS=18 FAIL=0 (GREEN)
 - dump.rb: still pass (7 groups, no regression); load.rb: non-float groups pass, one pre-existing legacy float precision fixture still fails under current mruby literal comparison (load.c unchanged)
 - DLL NOT YET synced (T18 does that)
+
+## [T18] DLL synced to 3 locations
+- Source: mruby-ext xmake build output
+- Destinations: RGSS-Godot/Plugins/windows/, Medot/editor/src-tauri/libs/, Medot/editor/src-tauri/resources/
+- SHA-256 all identical: E6AEFF477ADFFA001B5A58D0FF10CBE15E6C4ABE6EF2612CB4F9E2BBF632EB1C
+- cargo build: exit 0
+

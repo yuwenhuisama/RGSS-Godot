@@ -1,0 +1,11 @@
+T18 sync evidence
+Source: E:\Projects\RGSS-Godot\mruby-ext\build\windows\x64\release\libmruby_marshal_c_ext_x64.dll
+Destinations:
+- E:\Projects\RGSS-Godot\Plugins\windows\libmruby_marshal_c_ext_x64.dll
+- E:\Projects\Medot\editor\src-tauri\libs\libmruby_marshal_c_ext_x64.dll
+- E:\Projects\Medot\editor\src-tauri\resources\libmruby_marshal_c_ext_x64.dll
+SHA-256:
+- E:\Projects\RGSS-Godot\Plugins\windows\libmruby_marshal_c_ext_x64.dll E6AEFF477ADFFA001B5A58D0FF10CBE15E6C4ABE6EF2612CB4F9E2BBF632EB1C
+- E:\Projects\Medot\editor\src-tauri\libs\libmruby_marshal_c_ext_x64.dll E6AEFF477ADFFA001B5A58D0FF10CBE15E6C4ABE6EF2612CB4F9E2BBF632EB1C
+- E:\Projects\Medot\editor\src-tauri\resources\libmruby_marshal_c_ext_x64.dll E6AEFF477ADFFA001B5A58D0FF10CBE15E6C4ABE6EF2612CB4F9E2BBF632EB1C
+cargo build: exit 0
