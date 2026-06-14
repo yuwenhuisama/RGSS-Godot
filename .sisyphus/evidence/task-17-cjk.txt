@@ -1,0 +1,7 @@
+CJK raw bytes=[4, 8, 73, 34, 14, 229, 156, 176, 229, 155, 190, 229, 144, 141, 6, 58, 6, 69, 84]
+byte[2]=73
+has TYPE_IVAR=true
+has :E symbol bytes=true
+loaded="鍦板浘鍚?
+equal=true
+SUMMARY PASS=3 FAIL=0

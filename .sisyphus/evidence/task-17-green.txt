@@ -1,0 +1,78 @@
+================================================================================
+T17 EVIDENCE -- Marshal dump.c GREEN after final source
+================================================================================
+xmake: PASS (rebuilt mruby-ext, exit 0)
+t8runner xmake -r: PASS (rebuilt against final dump.c, exit 0)
+
+ROUNDTRIP.RB
+=== T8 roundtrip.rb : Marshal round-trip RED harness ===
+Marshal present? yes
+
+--- Group 1: basic types (MUST PASS -- proves harness validity) ---
+  [PASS] Symbol  :foo         -> :foo
+  [PASS] Symbol  :another     -> :another
+  [PASS] Integer 0            -> 0
+  [PASS] Integer 42           -> 42
+  [PASS] Integer 123          -> 123
+  [PASS] Integer -1234        -> -1234
+  [PASS] nil                  -> nil
+  [PASS] true                 -> true
+  [PASS] false                -> false
+  [PASS] String  "hello"      -> "hello"
+  [PASS] Array   [1,2,3]      -> [1, 2, 3]
+  [PASS] Array   [:a,1,nil]   -> [:a, 1, nil]
+  [PASS] Hash    {}           -> {}
+  [PASS] Hash    {a:1,b:2}    -> {a: 1, b: 2}
+
+--- Group 2: CJK string (EXPECTED RED -- missing :E encoding wrapper) ---
+  diag: dump bytes = [4, 8, 73, 34, 14, 229, 156, 176, 229, 155, 190, 229, 144, 141, 6, 58, 6, 69, 84]
+  diag: byte[2]=73 (0x49 'I' = TYPE_IVAR wrapper expected); present=true
+  diag: ':E' encoding pair present=true
+  diag: original bytesize=9, loaded bytesize=9
+  diag: NOTE -- mruby String#== compares BYTES, so a UTF-8-only build may
+        report equal even though the :E encoding wrapper was dropped on the
+        wire (visible above). Cross-VM/CRuby .rvdata2 interop is what breaks.
+  [PASS] CJK String byte round-trip (in-VM, == is byte compare) -> equal?=true
+  [PASS] CJK String emits :E encoding wrapper on the wire (BUG 2 -> expected FAIL pre-T17)
+
+--- Group 3: Object with 2 ivars (EXPECTED RED -- w_objivar count bug) ---
+  [PASS] TestObj(@a=1,@b=2) round-trip -> #<TestObj:0x1d44b4cbf80 @a=1, @b=2>
+
+--- Group 4: Object with CJK ivar (EXPECTED RED -- count + encoding bugs) ---
+  [PASS] TestCJK(@name="鍦板浘鍚?) round-trip -> #<TestCJK:0x1d44b4cb8a0 @name="鍦板浘鍚?>
+
+=== SUMMARY ===
+PASS=18  FAIL=0
+
+Harness validity gate: Group 1 (basic types) must be all-PASS.
+TDD RED gate: Group 3 & 4 (object ivars) must FAIL on the unpatched gem;
+T17's C fix flips them GREEN and this whole file should then exit 0.
+RESULT: GREEN (all round-trips survived)
+
+================================================================================
+DUMP.RB REGRESSION (combined temporary shim)
+================================================================================
+[PASS] Marshal.dump
+[PASS] Marshal.dump with a Fixnum
+[PASS] Marshal.dump with a symbol
+[PASS] Marshal.dump with a object
+[PASS] Marshal.dump with a float
+[PASS] Marshal.dump with an Array
+[PASS] Marshal.dump with an Hash
+SUMMARY PASS=7 FAIL=0
+DUMP.RB EXIT=0
+
+================================================================================
+LOAD.RB REGRESSION (combined temporary shim)
+================================================================================
+[PASS] Marshal.load
+[PASS] Marshal.load for an array containing the same objects
+[PASS] Marshal.load for a Symbol
+[PASS] Marshal.load for an Object
+[FAIL] Marshal.load for a Float: RuntimeError: expected 1.1867345e+22, got 1.1867345e+22
+[PASS] Marshal.load for an Integer
+SUMMARY PASS=5 FAIL=1
+(unknown):0: regression failures: 1 (RuntimeError)
+LOAD.RB EXIT=1
+
+NOTE: load.rb regression runner used the original test body with a minimal assert/assert_equal shim because the standalone Marshal-enabled runner lacks Kernel#load/mrbtest. All non-float load.rb groups passed. The single float fixture failure was isolated in float_probe.rb: Marshal.load(legacy float bytes) and the current mruby literal both inspect as 1.1867345e+22, but differ by -2097152.0; load.c was not modified in T17 and this is outside the dump.c bug fix scope.
