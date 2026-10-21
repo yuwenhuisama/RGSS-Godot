@@ -67,8 +67,8 @@ godot --headless --path . --quit-after 30
 
 ## 4. 独立实验：Wan FLF 动作生成（非引擎模块）
 
-本节记录独立的 Wan FLF 图像/视频生成探索实验，与 RGSS 运行时引擎解耦：
-- 生成批次：A → neutral 17 帧，neutral → B 17 帧；两段累计 2 次实际 POST，共 34 个原帧。
+本节记录最近的干净模板 Wan FLF 实验，与 RGSS 运行时引擎解耦。此前模板映射、Qwen 外观与多姿态编辑、Wan 动画等路线见 [生图研究历史](sprite-generation-research.md)。
+- 本轮生成批次：A → neutral 17 帧，neutral → B 17 帧；这两段累计 2 次实际 POST，共 34 个原帧，不是全部历史研究的请求总数。
 - 静态接缝审查建议优先保留完整 34 帧拼接 `joined-full-34.apng`；33 帧备选 `joined-candidate-33.apng` 仅略去第二段首帧 N0。两段 neutral 端点并非精确重复帧。
 - 规格参数：480x832 分辨率，16 fps 单次播放，仅做静态审查，未做连续回放评估。
 - 质量结论：仅有静态接缝偏好，不构成整段验收；第一片段中间帧姿态仍不可靠，连续播放及循环均未验证。

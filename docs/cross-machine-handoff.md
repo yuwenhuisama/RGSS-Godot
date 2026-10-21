@@ -99,10 +99,12 @@ dotnet build RGSS-Godot.csproj --no-restore
 - 切勿读取或复制 `opencode` 凭据、API Token 等机密文件。
 - `.godot/`、生成的 `.import` 元数据、`node_modules/` 等构建缓存无需迁移。不要整目录盲传 `oh-my-tokens.json` 等可能含凭据的文件；如需代理工具配置，逐项审查后单独配置。
 
-## 5. Wan 2.2 离线精灵实验资产迁移
+## 5. 生图研究与实验资产迁移
+
+先阅读 [生图研究历史](sprite-generation-research.md)，了解模板映射、整张 Qwen 编辑、提示词/控制图对照、静帧接 Wan、九姿态退化及最近干净模板 FLF 的演变。下列 17+17 帧只是最近一个实验分支，不是全部生图历史。
 
 ### 5.1 实验根目录
-所有实验文件位于未跟踪目录：
+本仓库的实验文件位于未跟踪目录（另一仓库的早期证据另见下文）：
 `E:\Projects\RGSS-Godot\.sprite-inspection-f6224097632b4e5fa4aaa03e86679a36\`
 
 ### 5.2 必须复制的文件与目录清单
@@ -118,6 +120,10 @@ dotnet build RGSS-Godot.csproj --no-restore
 4. **排除项**: `cache/`、`database/comfyui.db`、`temp/`、`base/` 等本地临时运行时目录。
 5. **绝对路径映射处理**: `mapping-full-34.json` 中的 `E:\Projects...` 属于不可变证据，切勿就地修改，迁移后在新环境按相对作业路径解析。
 
+继续此前研究还需保留同根目录的早期实验，不能仅复制以上两段：`whole-sheet-*`、`control-registration-*`、`prompt-control-*`、`redraw-v1/`、`redraw-v2/`、`walk-v2/`、`front-inputs/`、`front-v1/`、`rear-inputs/`、`rear-v1/`、`combined-v1/`、`qwen-nine-pose-*`、`qwen-left-triplet-*`、`qwen-left-A-correction-*`、`wan22-walk-*`、`wan22-three-direction-*`、`wan22-simultaneous-*`、`two-stage-three-view-*`（含其 motion 子目录）、`rmva-wan-candidate-*`，以及根目录 `00-base-body-head.png` 至 `40-scarf.png` 的分层输入。保留每组原始输入/输出、prompt、graph/request、history/response、README/REPORT、审查/审批、manifest/provenance、脚本及已使用的 intent/lock；缓存可排除，失败与 0 POST 记录不要删除。
+
+早期模板研究还涉及另一个仓库 `E:\Projects\Medot\editor\.omo\evidence\template-grounded-pixel-walk-*`，不会随本仓库克隆获得。会话来源与证据缺口见研究历史；不要把本机原始会话整包公开提交，先检查并仅迁移必要的脱敏研究摘要。当前仍未打包或实际传输这些资产。
+
 ### 5.3 关键模型与运行环境参数
 - **推理环境**: ComfyUI-Portable v0.39.0，Python 3.13.14，PyTorch 2.9.0+cu130，RTX 4090 24GB
 - **原机器 runtime**: `F:\AI\ComfyUI-Qwen21-v0.39.0-20261009\ComfyUI_windows_portable`；查看或处理已有帧无需部署整个生成环境，未来生成才需要。以上为历史记录，不是新机器已安装状态。
@@ -132,7 +138,7 @@ dotnet build RGSS-Godot.csproj --no-restore
   - 采样步数 20（前 10 步 high，后 10 步 low），Seed 20261020，CFG 3.5，Shift 5.0，Euler/Simple，16fps，17 帧
 
 ### 5.4 实验评估现状与后续限制
-- **生成记录**: 实际仅执行了 2 次 POST 提交（A->Neutral 17 帧 + Neutral->B 17 帧），未进行第三次 POST，亦未请求重新生成。
+- **本轮干净模板 FLF 生成记录**: 两段实际执行 2 次 POST（A->Neutral 17 帧 + Neutral->B 17 帧），该分支未追加第三次。更早 Qwen/Wan/诊断已有其他请求，不将本轮的 2 次当作全部研究累计次数。
 - **拼接结果**:
   - 推荐优先序列: `stitch/joined-full-34.apng`（34 帧，约 17.1MB，2.125 秒，保留完整 P0..P16 与 N0..N16）
   - 备用序列: `stitch/joined-candidate-33.apng`（33 帧，约 16.9MB，2.0625 秒，略过近中立帧 N0）
@@ -158,6 +164,7 @@ dotnet build RGSS-Godot.csproj --no-restore
   - 运行 dotnet build 与四项无头场景测试确认通过
 - [ ] **精灵实验资产**:
    - 复制 3 张源图、2 个 intent 文件及 2 个运行目录的 raw/report/stitch 输出
+   - 若继续完整研究，同步第 5.2 节的早期实验与另一个仓库的模板证据，而非只复制最近两段
    - 验证文件哈希，保持历史 intent 锁不变，严禁重复运行已完成任务
 
 生成脚本、模型配置和历史 manifest 含 `E:` / `F:` 绝对路径，复制并不等于可直接运行。只为未来获授权的新任务创建新目录和新预算，重新核对路径与 preflight；不得删除旧锁、复用旧 runner 或改写历史证据。
