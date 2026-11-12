@@ -153,19 +153,21 @@ public static class UnityModule
             return res;
         }
 
+        var scripts = state.NewArray();
         foreach (var (_, scriptName, scriptContent) in RmvaScripts)
         {
             RGSSLogger.Log($"run rmva script: {scriptName}");
-            res = inst.LoadScriptContentWithFileName(scriptName, scriptContent, out error);
+            res = inst.LoadScriptContentWithFileName(scriptName, "proc do\n" + scriptContent + "\nend", out error);
 
             if (error)
             {
                 state.Raise(res);
                 return res;
             }
+            scripts.Push(res);
         }
 
-        return state.RbNil;
+        return scripts.Value;
     }
 
     private static string SafeClassName(RbValue value)

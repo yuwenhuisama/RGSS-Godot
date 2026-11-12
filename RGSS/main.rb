@@ -1,4 +1,4 @@
-﻿# This script is the entry of the RGSS3 scripts.
+# This script is the entry of the RGSS3 scripts.
 # It loads the RMVA scripts and runs the main loop.
 # It also catches unhandled exceptions and notifies the native side.
 # It requires the RMVA scripts and the RMVA scripts require the RGSS3 scripts.
@@ -41,7 +41,7 @@ def run_scripts
     end
   end
 
-  Unity.run_rmva_scripts
+  Unity.run_rmva_scripts.each { |script| script.call }
 end
 
 begin
@@ -75,13 +75,20 @@ begin
   require 'rgss_error'
   require 'rgss_reset'
 
-  run_scripts
-  msgbox "RGSS3 scripts loaded successfully."
-
-  require 'patch_rmva'
-
-  msgbox "Running RGSS3 main loop..."
-  $rgss_main_callback.call if $rgss_main_callback
+  main_fiber = Fiber.new do
+    begin
+      run_scripts
+      msgbox "RGSS3 scripts loaded successfully."
+      require 'patch_rmva' if Object.const_defined?(:DataManager) && Object.const_defined?(:Cache) && Object.const_defined?(:SceneManager)
+      msgbox "Running RGSS3 main loop..."
+      $rgss_main_callback.call if $rgss_main_callback
+    rescue Exception => e
+      Unity.on_top_exception(format_exc_string(e))
+    ensure
+      Unity.unregister_update_fiber
+    end
+  end
+  Unity.register_update_fiber(main_fiber)
 rescue Exception => e
   str = format_exc_string(e)
   Unity.on_top_exception(str)

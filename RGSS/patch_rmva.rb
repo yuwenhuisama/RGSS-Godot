@@ -5,17 +5,7 @@ module SceneManager
     Audio.setup_midi if use_midi?
     @scene = first_scene_class.new
 
-    @update_fiber = Fiber.new do
-      begin
-        @scene.main while @scene
-      rescue Exception => e
-        str = format_exc_string(e)
-        Unity.on_top_exception(str)
-      end
-      Unity.unregister_update_fiber
-    end
-
-    Unity.register_update_fiber @update_fiber
+    @scene.main while @scene
   end
 end
 

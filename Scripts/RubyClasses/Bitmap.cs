@@ -27,6 +27,13 @@ public static class Bitmap
         var relativePath = filename.ToStringUnchecked()!;
         var path = RMProjectPath.Resolve(relativePath);
 
+        if (!Path.HasExtension(path)) path += ".png";
+        if (!File.Exists(path) && !Path.IsPathRooted(relativePath) && !string.IsNullOrEmpty(GlobalConfig.Instance.RtpPath))
+        {
+            path = Path.Combine(GlobalConfig.Instance.RtpPath, relativePath);
+            if (!Path.HasExtension(path)) path += ".png";
+        }
+
         if (!File.Exists(path))
         {
             state.RaiseRGSSError($"Failed to load image data, file not found: {relativePath}");
