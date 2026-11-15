@@ -1,13 +1,15 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 $destination = Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/f02-save-interchange-original'
-Get-ChildItem 'E:/Projects/RMProject/Data/*.rvdata2' | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
+Get-ChildItem (Join-Path (Get-TestPath 'game_project') 'Data/*.rvdata2') | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
 Set-Location $destination
 $refresh = @'
 require 'zlib'
-fixture = "$save_interchange_peer='E:/Projects/RGSS-Godot/.omo/evidence/rmva-compatibility/godot/save-interchange/Save1.rvdata2'\n" + File.read('../../../tests/fixtures/save_interchange_reference.rb')
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
+fixture = "$save_interchange_peer=#{TestPathsConfig.repo('.omo/evidence/rmva-compatibility/godot/save-interchange/Save1.rvdata2').inspect}\n" + File.read('../../../tests/fixtures/save_interchange_reference.rb')
 wrapper = "begin\n" + fixture + "\nrescue SystemExit\nraise\nrescue Exception => error\nFile.open('save_interchange_error.txt','w') { |file| file.puts error.class,error.message,error.backtrace }; exit\nend\n"
 scripts = Marshal.load(File.binread('Data/Scripts.rvdata2'))
-scripts[-1][2] = Zlib::Deflate.deflate(wrapper)
+scripts[-1][2] = Zlib::Deflate.deflate(TestPathsConfig.fixture_source(wrapper))
 File.binwrite('Data/Scripts.rvdata2', Marshal.dump(scripts))
 '@
 $refresh | ruby

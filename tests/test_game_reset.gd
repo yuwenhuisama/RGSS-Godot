@@ -1,9 +1,12 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	TestPaths.required("game_project")
 	var game: Node = load("res://Scenes/Boot.tscn").instantiate()
 	root.add_child(game)
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()

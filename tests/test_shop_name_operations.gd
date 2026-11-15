@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 var driver
 var ok := true
 
@@ -28,18 +30,19 @@ func check(code: String) -> void:
 
 func _run() -> void:
 	driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	check("DataManager.setup_new_game; SceneManager.goto(Scene_Map)")
 	await frames(180)
 	var baseline := Vector3i(driver.GetViewportCount(), driver.GetSpriteCount(), driver.GetWindowCount())
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/shop-name")
+	var output := TestPaths.output("shop-name")
 	DirAccess.make_dir_recursive_absolute(output)
 	var reference_path := output.path_join("shop_name_reference.tsv")
 	if FileAccess.file_exists(reference_path):
 		DirAccess.remove_absolute(reference_path)
-	check("$shop_name_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/shop_name_reference.rb"))
-	var original := FileAccess.get_file_as_string("res://tests/fixtures/shop_name_original.tsv").replace("\r\n", "\n").strip_edges()
+	check("$shop_name_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("shop_name_reference.rb")))
+	var original := FileAccess.get_file_as_string(TestPaths.fixture("shop_name_original.tsv")).replace("\r\n", "\n").strip_edges()
 	var actual := FileAccess.get_file_as_string(reference_path).replace("\r\n", "\n").strip_edges()
 	if original.is_empty() or actual != original:
 		push_error("Shop/name numeric reference differs from original RGSS300")

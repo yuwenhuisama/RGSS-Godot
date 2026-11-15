@@ -1,5 +1,7 @@
-param([string]$Device = 'Voicemeeter Out B2 (VB-Audio Voicemeeter VAIO)', [string]$Name = 'e07-route-b2-control')
+param([string]$Device, [string]$Name = 'e07-route-b2-control')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
+if (!$Device) { $Device = Get-TestSetting 'audio_device_secondary' }
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root ('.omo/compatibility-run-tmp/' + $Name)
 if (Test-Path $work) { throw 'Control directory already exists' }
@@ -13,7 +15,7 @@ public static class AudioRouteControl {
 }
 '@
 $args = '-hide_banner -loglevel info -thread_queue_size 512 -f dshow -i "audio=' + $Device + '" -t 4 -ac 2 -ar 48000 -y "' + (Join-Path $work 'control.wav') + '"'
-$recording = Start-Process 'F:/Softwares/oopz/ffmpeg.exe' -ArgumentList $args -RedirectStandardError (Join-Path $work 'capture.log') -PassThru -NoNewWindow
+$recording = Start-Process (Get-TestPath 'ffmpeg') -ArgumentList $args -RedirectStandardError (Join-Path $work 'capture.log') -PassThru -NoNewWindow
 $null = $recording.Handle
 $tone = Join-Path $root 'tests/fixtures/audio/tone.wav'
 for ($i = 0; $i -lt 5; $i++) {

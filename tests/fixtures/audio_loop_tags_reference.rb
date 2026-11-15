@@ -1,5 +1,5 @@
 output=$rgss_compat_output || '.'
-tone='E:/Projects/RGSS-Godot/tests/fixtures/audio/loop-tagged.ogg'
+tone=TestPaths.fixture('audio/loop-tagged.ogg')
 Graphics.frame_rate=60
 File.open(File.join(output,'audio_loop_tags_reference.tsv'),'w') do |file|
   [:bgm,:bgs].each do |channel|

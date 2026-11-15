@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root '.omo/evidence/windows-current-gzip-package'
 if (Test-Path $work) { throw 'Evidence already exists' }

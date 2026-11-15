@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 var driver
 
 func _initialize() -> void:
@@ -25,7 +27,7 @@ func _run() -> void:
 	root.exclude_from_capture = false
 	root.current_screen = DisplayServer.get_primary_screen()
 	root.position = DisplayServer.screen_get_position(root.current_screen) + Vector2i(100,100)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/resize")
+	var output := TestPaths.output("resize")
 	DirAccess.make_dir_recursive_absolute(output)
 	var ok: bool = driver.RunRuby("require 'graphics'; require 'bitmap'; require 'sprite'; require 'viewport'; require 'color'; Graphics.resize_screen(640,480); $resize_bitmap=Bitmap.new(640,480); $resize_bitmap.fill_rect($resize_bitmap.rect,Color.new(20,80,120)); $resize_bitmap.fill_rect(0,0,640,4,Color.new(255,0,0)); $resize_bitmap.fill_rect(636,0,4,480,Color.new(0,255,0)); $resize_bitmap.fill_rect(0,476,640,4,Color.new(0,0,255)); $resize_bitmap.fill_rect(0,0,4,480,Color.new(255,255,0)); $resize_sprite=Sprite.new; $resize_sprite.bitmap=$resize_bitmap; $resize_viewport=Viewport.new; raise 'new viewport dimensions' unless $resize_viewport.rect.width==640 && $resize_viewport.rect.height==480")
 	await frames()

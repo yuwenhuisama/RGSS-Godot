@@ -56,6 +56,8 @@ jobs:
           cp export_templates/templates/* "$destination/"
       - name: Build managed runtime with bundled native libraries
         run: dotnet build RGSS-Godot.csproj
+      - name: Reject machine-specific test paths
+        run: python3 tools/check_test_paths.py
       - name: Run data-independent native and Ruby contracts
         shell: bash
         run: |

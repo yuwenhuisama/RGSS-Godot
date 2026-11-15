@@ -1,5 +1,6 @@
 param([string]$Name = 'windows-clean-install')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root ('.omo/evidence/' + $Name)
 if (Test-Path $work) { throw 'Clean-install evidence already exists' }
@@ -7,19 +8,19 @@ New-Item -ItemType Directory -Path $work | Out-Null
 $install = Join-Path $work 'install'
 New-Item -ItemType Directory -Path $install | Out-Null
 $exe = Join-Path $install 'RGSS-Godot.exe'
-& 'E:/Godot/Godot_v4.6.1-stable_mono_win64_console.exe' --headless --path $root --export-release 'Windows Desktop' $exe --max-fps 60 --quit-after 120 --log-file (Join-Path $work 'export.log')
+& (Get-TestPath 'godot') --headless --path $root --export-release 'Windows Desktop' $exe --max-fps 60 --quit-after 120 --log-file (Join-Path $work 'export.log')
 if ($LASTEXITCODE -ne 0) { throw "Export failed: $LASTEXITCODE" }
 Copy-Item (Join-Path $root 'RGSS') (Join-Path $install 'RGSS') -Recurse
 $project = Join-Path $install 'RMProject'
 New-Item -ItemType Directory -Path $project | Out-Null
 foreach ($folder in @('Data', 'Graphics', 'Audio', 'Movies')) {
-    Copy-Item (Join-Path 'E:/Projects/RMProject' $folder) (Join-Path $project $folder) -Recurse
+    Copy-Item (Join-Path (Get-TestPath 'game_project') $folder) (Join-Path $project $folder) -Recurse
 }
 # Installed licensed assets are copied only into this local acceptance fixture.
 $rtp = Join-Path $install 'RTP'
 New-Item -ItemType Directory -Path $rtp | Out-Null
 foreach ($folder in @('Graphics', 'Audio')) {
-    Copy-Item (Join-Path 'F:/Softwares/RPG Maker VX Ace/RTP' $folder) (Join-Path $rtp $folder) -Recurse
+    Copy-Item (Join-Path (Get-TestPath 'rtp') $folder) (Join-Path $rtp $folder) -Recurse
 }
 $config = @{
     project_path = '.'

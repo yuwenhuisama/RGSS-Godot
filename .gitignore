@@ -8,6 +8,9 @@
 bin/
 obj/
 .mono/
+
+# Machine-local test inputs. Only .test-paths.example.json is versioned.
+.test-paths.local.json
 *.user
 *.userprefs
 

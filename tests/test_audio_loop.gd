@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -16,7 +18,7 @@ func _run() -> void:
 	capture.buffer_length = 1.0
 	AudioServer.add_bus_effect(0,capture)
 	for extension in ["wav","ogg","mp3","wma"]:
-		var tone := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone." + extension)
+		var tone := TestPaths.fixture("audio/tone." + extension)
 		ok = driver.RunRuby("Audio.bgm_play(" + JSON.stringify(tone) + ",20); Audio.bgs_play(" + JSON.stringify(tone) + ",20)") and ok
 		for frame in range(54):
 			await process_frame
@@ -39,7 +41,7 @@ func _run() -> void:
 				push_error("%s %s ended instead of looping" % [extension,channel])
 				ok = false
 		ok = driver.RunRuby("Audio.bgm_stop; Audio.bgs_stop") and ok
-	var replacement := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.ogg")
+	var replacement := TestPaths.fixture("audio/tone.ogg")
 	ok = driver.RunRuby("Audio.bgm_play(" + JSON.stringify(replacement) + ",20); Audio.bgm_fade(500)") and ok
 	for frame in range(6):
 		await process_frame

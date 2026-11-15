@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-base="$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
 payload="$base/mac-release-native-path/install/RGSS-Godot.app/Contents/Resources/data_RGSS-Godot_macos_arm64/Plugins/macos"
 out="$base/mac-release-native-path/payload-audit.tsv"
 printf 'relative_path\tsha256\n' > "$out"

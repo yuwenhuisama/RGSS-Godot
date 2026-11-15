@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Standalone contract and physical-mode harness runner for C12 Windows original fullscreen.
 #
 # Modes:
@@ -289,8 +291,12 @@ func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var legacy_red := "--legacy-godot-fullscreen" in args
 	var interactive := "--interactive" in args
-	var control_dir := ProjectSettings.globalize_path(_arg_value("--control-dir", "res://.omo/compatibility-run-tmp/c12-host-run"))
-	var output_dir := ProjectSettings.globalize_path(_arg_value("--output-dir", "res://.omo/evidence/c12-host-self"))
+	var control_arg := _arg_value("--control-dir", "")
+	var control_dir := TestPaths.repo(".omo/compatibility-run-tmp/c12-host-run") if control_arg.is_empty() else ProjectSettings.globalize_path(control_arg)
+	var output_arg := _arg_value("--output-dir", "")
+	var output_dir := TestPaths.repo(".omo/evidence/c12-host-self") if output_arg.is_empty() else ProjectSettings.globalize_path(output_arg)
+	DirAccess.make_dir_recursive_absolute(control_dir)
+	DirAccess.make_dir_recursive_absolute(output_dir)
 	var initial_logical := _parse_size(_arg_value("--logical-size", "640x480"), Vector2i(640, 480))
 
 	# Isolate user://rgss_settings.cfg state before instantiating GameSettings.

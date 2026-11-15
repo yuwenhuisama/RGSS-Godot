@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Standalone rendered D05 runner; suite registration belongs to the lead.
 var driver
 var output := ""
@@ -83,7 +85,8 @@ func finish_case() -> void:
 
 func _run() -> void:
 	Engine.max_fps = 60
-	output = ProjectSettings.globalize_path("res://.omo/evidence/d05-message/godot")
+	TestPaths.required("game_project")
+	output = TestPaths.repo(".omo/evidence/d05-message/godot")
 	DirAccess.make_dir_recursive_absolute(output)
 	for name in ["message_window_reference.tsv", "d05-message-error.txt"]:
 		if FileAccess.file_exists(output.path_join(name)):
@@ -98,7 +101,7 @@ func _run() -> void:
 		bootstrap += "require '" + name + "'\n"
 	bootstrap += "Unity.run_rmva_scripts\n"
 	bootstrap += "File.open(File.join(Unity.rmva_project_path, 'RMProject/Data/Scripts.rvdata2'),'rb') { |f| Marshal.load(f).each { |s| Unity.register_rmva_script(s[0],s[1],s[2]) unless s[1] == 'Main' } }\nUnity.run_rmva_scripts.each { |s| s.call }\n$rmva_project_base_path = Unity.rmva_project_path; $rtp_path = Unity.rtp_path; require 'patch_rmva'\n$d05_host = true\n"
-	bootstrap += FileAccess.get_file_as_string("res://tests/fixtures/message_window_reference.rb")
+	bootstrap += TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("message_window_reference.rb"))
 	if not ruby(bootstrap, "load-stock-classes"):
 		driver.Shutdown()
 		quit(1)

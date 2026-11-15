@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -10,10 +12,10 @@ func _run() -> void:
 	driver.Initialize(host)
 	var ok: bool = driver.RunRuby("require 'color'; require 'tone'; require 'rect'; require 'font'; require 'bitmap'")
 	if ok:
-		var image_path := ProjectSettings.globalize_path("res://tests/fixtures/bitmap-file-reference.png")
+		var image_path := TestPaths.fixture("bitmap-file-reference.png")
 		ok = driver.RunRuby("loaded=Bitmap.new(" + JSON.stringify(image_path) + "); raise 'file bitmap dimensions' unless [loaded.width,loaded.height,loaded.rect.width,loaded.rect.height] == [16,12,16,12]; loaded.dispose")
 	if ok:
-		var mixed_case_path := ProjectSettings.globalize_path("res://tests/FIXTURES/BITMAP-FILE-REFERENCE.PNG")
+		var mixed_case_path := TestPaths.fixture("bitmap-file-reference.png").to_upper()
 		ok = driver.RunRuby("path=" + JSON.stringify(mixed_case_path) + "; raise 'case-insensitive bitmap probe' unless Unity::Bitmap.file_exists?(path); loaded=Bitmap.new(path); raise 'case-insensitive bitmap load' unless [loaded.width,loaded.height] == [16,12]; loaded.dispose")
 	if ok:
 		ok = driver.RunRuby("""

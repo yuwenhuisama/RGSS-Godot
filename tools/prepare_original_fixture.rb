@@ -1,5 +1,6 @@
 require 'fileutils'
 require 'zlib'
+require_relative 'test_paths'
 
 # Creates an isolated RGSS3 project; never writes into the source game.
 source, destination, script = ARGV
@@ -12,24 +13,25 @@ ini = File.read(File.join(source, 'Game.ini'))
 library = ini.lines.find { |line| line.start_with?('Library=') }.split('=', 2).last.strip
 FileUtils.cp(File.join(source, library.tr('\\', '/')), File.join(destination, library.tr('\\', '/')))
 File.write(File.join(destination, 'Game.ini'), "[Game]\nRTP=\nLibrary=#{library}\nScripts=Data\\Scripts.rvdata2\nTitle=RGSS Compatibility Fixture\n")
-payload = [[1, 'Compatibility', Zlib::Deflate.deflate(File.read(script))]]
+script_source = TestPathsConfig.fixture_source(File.read(script))
+payload = [[1, 'Compatibility', Zlib::Deflate.deflate(script_source)]]
 if ARGV[3] == '--tile-render'
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_render=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_render=true\n" + script_source)]]
 end
 if ARGV.include?('--tile-tables')
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_tables=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_tables=true\n" + script_source)]]
 end
 if ARGV.include?('--tile-render') && ARGV.include?('--tile-tables')
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_render=true\n$tilemap_probe_tables=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_render=true\n$tilemap_probe_tables=true\n" + script_source)]]
 end
 if ARGV[3] == '--tile-animation'
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_animation=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_animation=true\n" + script_source)]]
 end
 if ARGV[3] == '--tile-origin'
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_origin=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$tilemap_probe_origin=true\n" + script_source)]]
 end
 if ARGV[3] == '--record-transition'
-  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$record_transition_video=true\n" + File.read(script))]]
+  payload = [[1, 'Compatibility', Zlib::Deflate.deflate("$record_transition_video=true\n" + script_source)]]
 end
 if ARGV[3] == '--stock-scripts'
   stock = Marshal.load(File.binread(File.join(source, 'Data', 'Scripts.rvdata2')))

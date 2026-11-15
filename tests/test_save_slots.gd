@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func frames(count: int) -> void:
 	for frame in range(count):
 		await process_frame
@@ -19,6 +21,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	for frame in range(180):
 		await process_frame
@@ -40,7 +43,7 @@ func _run() -> void:
 		await tap(KEY_ESCAPE)
 		await frames(90)
 		ok = driver.RunRuby("raise 'menu cancel did not resume map' unless SceneManager.scene.is_a?(Scene_Map)") and ok
-		var flow_output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/project-flow")
+		var flow_output := TestPaths.output("project-flow")
 		DirAccess.make_dir_recursive_absolute(flow_output)
 		# The event list enters the stock battle scene and resumes after victory.
 		ok = driver.RunRuby("""
@@ -92,11 +95,11 @@ $game_player.moveto(5,5); $game_player.set_direction(6)
 			print("TITLE_SAVE_FLOW_FAIL")
 			quit(1)
 			return
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/save-slots")
+	var output := TestPaths.output("save-slots")
 	if from_title:
-		output = ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/project-flow/save-slots")
+		output = TestPaths.output("project-flow/save-slots")
 	DirAccess.make_dir_recursive_absolute(output)
-	var code := ("" if from_title else "DataManager.setup_new_game; ") + "$save_slots_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/save_slots_reference.rb")
+	var code := ("" if from_title else "DataManager.setup_new_game; ") + "$save_slots_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("save_slots_reference.rb"))
 	if from_title:
 		ok = driver.RunRuby("File.open(%s,'w') { |file| ([$game_player]+$game_map.events.values.to_a).each { |character| file.puts([character.class,character.pattern,character.pattern.class,character.blend_type,character.blend_type.class].join('\t')) } }" % JSON.stringify(output.path_join("character-types-before.txt"))) and ok
 	ok = driver.RunRuby(code) and ok

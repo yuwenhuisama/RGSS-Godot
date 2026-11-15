@@ -1,21 +1,24 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	for frame in range(180):
 		await process_frame
 		await RenderingServer.frame_post_draw
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot")
+	var output := TestPaths.output()
 	var path := output.path_join("event_transfer_reference.tsv")
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
 	var base := ProjectSettings.globalize_path("user://event_transfer_fixture")
 	DirAccess.make_dir_recursive_absolute(base.path_join("RMProject/Data"))
-	var code := "$event_transfer_base=" + JSON.stringify(base) + "\n$rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/event_transfer_reference.rb")
+	var code := "$event_transfer_base=" + JSON.stringify(base) + "\n$rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("event_transfer_reference.rb"))
 	var ok: bool = driver.RunRuby(code)
 	if ok:
 		var actual := FileAccess.get_file_as_string(path).replace("\r\n", "\n").strip_edges()

@@ -1,6 +1,6 @@
 output = $rgss_compat_output || '.'
-bgm = $audio_me_bgm || 'F:/Softwares/RPG Maker VX Ace/RTP/Audio/BGM/Theme1.ogg'
-me = $audio_me_sound || 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.ogg'
+bgm = $audio_me_bgm || TestPaths.rtp('Audio/BGM/Theme1.ogg')
+me = $audio_me_sound || TestPaths.fixture('audio/tone.ogg')
 Graphics.frame_rate = 60
 File.open(File.join(output, 'audio_me_reference.tsv'), 'w') do |file|
   Audio.bgm_play(bgm, 80, 100)

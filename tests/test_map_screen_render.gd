@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Real-renderer map-screen contract: stock Spriteset_Map, Game_Screen,
 # Sprite_Picture and Spriteset_Weather through the live Godot renderer.
 # Requires a real GPU renderer; do not run with --headless.
@@ -75,16 +77,17 @@ func _bright_pixels(path: String) -> int:
 func _run() -> void:
 	var ok := true
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await _frames(180)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/map-screen-render")
+	var output := TestPaths.output("map-screen-render")
 	DirAccess.make_dir_recursive_absolute(output)
 	var tsv := output.path_join("map_screen_render_reference.tsv")
 	var weather_tsv := output.path_join("map_screen_weather_reference.tsv")
 	for stale in [tsv, weather_tsv, output.path_join("map_screen_render_error.txt")]:
 		if FileAccess.file_exists(stale):
 			DirAccess.remove_absolute(stale)
-	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n$map_screen_fiber=Fiber.new do\n" + FileAccess.get_file_as_string("res://tests/fixtures/map_screen_render_reference.rb") + "\nend"
+	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n$map_screen_fiber=Fiber.new do\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("map_screen_render_reference.rb")) + "\nend"
 	ok = driver.RunRuby(code) and ok
 	for frame in range(160):
 		driver.UpdateRenderManager()
@@ -161,10 +164,10 @@ func _run() -> void:
 			if not particle.has(kind):
 				push_error("Missing weather particle rows for " + kind)
 				ok = false
-		var edge_code := "$weather_bounds_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/weather_bounds_reference.rb")
+		var edge_code := "$weather_bounds_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("weather_bounds_reference.rb"))
 		ok = driver.RunRuby(edge_code) and ok
 		var edge_actual := FileAccess.get_file_as_string(output.path_join("weather_bounds_reference.tsv")).replace("\r\n", "\n").strip_edges()
-		var edge_original := FileAccess.get_file_as_string("res://tests/fixtures/weather_bounds_original.tsv").replace("\r\n", "\n").strip_edges()
+		var edge_original := FileAccess.get_file_as_string(TestPaths.fixture("weather_bounds_original.tsv")).replace("\r\n", "\n").strip_edges()
 		if edge_actual != edge_original or edge_original.is_empty():
 			push_error("Weather lifetime/type-switch edge differs from original RGSS300")
 			ok = false

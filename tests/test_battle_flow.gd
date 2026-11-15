@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 var driver
 var ok := true
 
@@ -25,20 +27,21 @@ func tap(code: Key) -> void:
 
 func _run() -> void:
 	driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	if "--manager" in OS.get_cmdline_user_args():
-		var manager_output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/battle-flow")
+		var manager_output := TestPaths.output("battle-flow")
 		DirAccess.make_dir_recursive_absolute(manager_output)
 		var manager_path := manager_output.path_join("battle_end_reference.tsv")
 		if FileAccess.file_exists(manager_path):
 			DirAccess.remove_absolute(manager_path)
-		check("$battle_end_host=true; $rgss_compat_output=" + JSON.stringify(manager_output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/battle_end_reference.rb"))
+		check("$battle_end_host=true; $rgss_compat_output=" + JSON.stringify(manager_output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("battle_end_reference.rb")))
 		var actual := FileAccess.get_file_as_string(manager_path).replace("\r\n","\n").strip_edges()
-		var original := FileAccess.get_file_as_string("res://tests/fixtures/battle_end_original.tsv").replace("\r\n","\n").strip_edges()
+		var original := FileAccess.get_file_as_string(TestPaths.fixture("battle_end_original.tsv")).replace("\r\n","\n").strip_edges()
 		ok = not original.is_empty() and actual==original and ok
 		var initiative_actual := FileAccess.get_file_as_string(manager_output.path_join("battle_initiative_reference.tsv")).replace("\r\n","\n").strip_edges()
-		var initiative_original := FileAccess.get_file_as_string("res://tests/fixtures/battle_initiative_original.tsv").replace("\r\n","\n").strip_edges()
+		var initiative_original := FileAccess.get_file_as_string(TestPaths.fixture("battle_initiative_original.tsv")).replace("\r\n","\n").strip_edges()
 		ok = not initiative_original.is_empty() and initiative_actual==initiative_original and ok
 		check("SceneManager.goto(Scene_Base)")
 		print("BATTLE_END_REFERENCE_PASS" if ok else "BATTLE_END_REFERENCE_FAIL")
@@ -47,7 +50,7 @@ func _run() -> void:
 	check("DataManager.setup_new_game; SceneManager.goto(Scene_Map)")
 	await frames(180)
 	var baseline := Vector3i(driver.GetViewportCount(),driver.GetSpriteCount(),driver.GetWindowCount())
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/battle-flow")
+	var output := TestPaths.output("battle-flow")
 	DirAccess.make_dir_recursive_absolute(output)
 	check("$battle_flow_saved_count=$game_system.battle_count; $battle_flow_troop=RPG::Troop.new; $battle_flow_troop.id=$data_troops.size; member=RPG::Troop::Member.new; member.enemy_id=1; member.x=272; member.y=240; $battle_flow_troop.members=[member]; $data_troops << $battle_flow_troop; $battle_flow_results=[]")
 	for ending in ["escape", "abort", "allowed-defeat", "victory", "failed-escape", "disabled-escape", "gameover"]:

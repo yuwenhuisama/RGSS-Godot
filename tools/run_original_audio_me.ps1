@@ -1,14 +1,16 @@
 param([switch]$Midi)
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 $destination = Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/e07-audio-me-original'
 Set-Location $destination
 $refresh = @'
 require 'zlib'
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
 fixture = File.read('../../../tests/fixtures/audio_me_reference.rb')
 if ARGV[0] == 'midi'
-  fixture = "$audio_me_bgm='E:/Projects/RGSS-Godot/tests/fixtures/midi-reference.mid'; $rgss_compat_output='midi'\n" + fixture
+  fixture = "$audio_me_bgm=#{TestPathsConfig.repo('tests/fixtures/midi-reference.mid').inspect}; $rgss_compat_output='midi'\n" + fixture
 end
-File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(fixture)]]))
+File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(TestPathsConfig.fixture_source(fixture))]]))
 '@
 if ($Midi) {
     New-Item -ItemType Directory -Force './midi' | Out-Null

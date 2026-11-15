@@ -1,5 +1,5 @@
 output = $rgss_compat_output || '.'
-tone = $audio_replay_tone || 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.ogg'
+tone = $audio_replay_tone || TestPaths.fixture('audio/tone.ogg')
 Graphics.frame_rate = 60
 File.open(File.join(output, 'audio_replay_reference.tsv'), 'w') do |file|
   Audio.bgm_play(tone, 80, 100)

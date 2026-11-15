@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-base="$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
 tar -xf "$base/mac-game-assets.tar.gz" -C "$base/project"
 printf '{"project_path":"%s","rtp_path":"%s","legacy_mode":true,"legacy_mode_width":544,"legacy_mode_height":416,"cn_ver_rmva":true}\n' "$base/project" "$base/project/RTP" > "$base/project/rm_conf.json"
 export DOTNET_ROOT="$base/dotnet"

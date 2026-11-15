@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -8,9 +10,9 @@ func _run() -> void:
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot")
+	var output := TestPaths.output()
 	var code := "require 'color'; require 'tone'; require 'rect'; require 'font'; require 'bitmap'; require 'sprite'; require 'viewport'; require 'window'; require 'graphics'; $rgss_compat_output=" + JSON.stringify(output) + "\n"
-	code += "$reference_fiber=Fiber.new do\n" + FileAccess.get_file_as_string("res://tests/fixtures/window_activation_reference.rb").trim_suffix("exit\n") + "\nend"
+	code += "$reference_fiber=Fiber.new do\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("window_activation_reference.rb")).trim_suffix("exit\n") + "\nend"
 	var ok: bool = driver.RunRuby(code)
 	for frame in range(150):
 		driver.UpdateRenderManager()

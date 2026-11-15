@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -8,7 +10,7 @@ func _run() -> void:
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var midi := ProjectSettings.globalize_path("res://tests/fixtures/midi-reference.mid")
+	var midi := TestPaths.fixture("midi-reference.mid")
 	var ok: bool = driver.RunRuby("require 'audio'; Audio.setup_midi; Audio.bgm_play(" + JSON.stringify(midi) + ")")
 	await create_timer(0.8).timeout
 	ok = driver.HasMidiPlayback() and ok
@@ -23,7 +25,7 @@ func _run() -> void:
 	ok = driver.RunRuby("raise 'MIDI fade did not stop' unless Audio.bgm_pos == 0; Audio.bgm_stop") and ok
 	ok = not driver.HasMidiPlayback() and ok
 	for filename in ["midi-reference-sysex.mid", "midi-reference-smpte.mid"]:
-		var path := ProjectSettings.globalize_path("res://tests/fixtures/" + filename)
+		var path := TestPaths.fixture(filename)
 		ok = driver.RunRuby("Audio.bgm_play(" + JSON.stringify(path) + ")") and ok
 		await create_timer(0.2).timeout
 		ok = driver.HasMidiPlayback() and ok

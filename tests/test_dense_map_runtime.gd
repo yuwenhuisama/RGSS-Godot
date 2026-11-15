@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # D09 dense-event / long-running map acceptance, live Scene_Map path.
 #
 # 96 simultaneous map events injected into the live map, then exercised through
@@ -53,13 +55,13 @@ func counts(driver) -> Vector3i:
 	return Vector3i(driver.GetViewportCount(), driver.GetSpriteCount(), driver.GetWindowCount())
 
 func _fixture_run(driver) -> void:
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/dense-map")
+	var output := TestPaths.output("dense-map")
 	DirAccess.make_dir_recursive_absolute(output)
 	var path := output.path_join("dense_map_reference.tsv")
 	for stale in [path, output.path_join("dense_map_reference_error.txt")]:
 		if FileAccess.file_exists(stale):
 			DirAccess.remove_absolute(stale)
-	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/dense_map_reference.rb")
+	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("dense_map_reference.rb"))
 	var ok: bool = driver.RunRuby(code)
 	if not ok:
 		push_error("Dense map fixture raised")
@@ -75,7 +77,7 @@ func _fixture_run(driver) -> void:
 		if rows.size() != FIXTURE_ROWS:
 			push_error("Dense map fixture wrote %d rows, expected %d" % [rows.size(), FIXTURE_ROWS])
 			ok = false
-		var original := ProjectSettings.globalize_path("res://tests/fixtures/dense_map_original.tsv")
+		var original := TestPaths.fixture("dense_map_original.tsv")
 		if not FileAccess.file_exists(original):
 			push_error("Missing original dense map fixture tests/fixtures/dense_map_original.tsv")
 			ok = false
@@ -105,6 +107,7 @@ func _run() -> void:
 		return
 	var ok := true
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	if "--fixture" in OS.get_cmdline_user_args():
@@ -116,7 +119,7 @@ func _run() -> void:
 	var parallel_expected := (parallel_frames + 31) / 32 if soak else PARALLEL_EXPECTED
 	if soak:
 		Engine.max_fps = 60
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/dense-map")
+	var output := TestPaths.output("dense-map")
 	if soak:
 		output = output.path_join("soak")
 	if profile:

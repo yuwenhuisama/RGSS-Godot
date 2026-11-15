@@ -27,6 +27,17 @@ public sealed class GlobalConfig
     public static void Initialize()
     {
         Instance = Load();
+        var args = OS.GetCmdlineArgs();
+        var scriptIndex = Array.IndexOf(args, "-s");
+        if (scriptIndex >= 0 && scriptIndex + 1 < args.Length &&
+            (args[scriptIndex + 1].Replace('\\', '/').Contains("tests/") || args[scriptIndex + 1].EndsWith("run_tests.gd")))
+            TestPathConfig.Apply(Instance);
+    }
+
+    internal void SetTestPaths(string project, string rtp)
+    {
+        ProjectPath = project;
+        RtpPath = rtp;
     }
 
     private static GlobalConfig Load()

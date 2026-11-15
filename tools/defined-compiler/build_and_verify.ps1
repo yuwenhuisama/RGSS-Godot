@@ -1,12 +1,13 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'test_paths.ps1')
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $expRoot = Join-Path $repoRoot '.omo/compatibility-run-tmp/f05-defined-compiler'
 $mrubyCopy = Join-Path $expRoot 'mruby'
 $patchSourceOnly = Join-Path $PSScriptRoot 'mruby-4.0.0-defined-compiler.source.patch'
 $patchFull = Join-Path $PSScriptRoot 'mruby-4.0.0-defined-compiler.full.patch'
-$sharedMruby = 'E:/Projects/mruby-for-dotnet/mruby'
-$sharedGlueSrc = 'E:/Projects/mruby-for-dotnet/mruby-shared'
+$sharedMruby = Get-TestPath 'mruby_source'
+$sharedGlueSrc = Join-Path (Split-Path $sharedMruby -Parent) 'mruby-shared'
 
 New-Item -ItemType Directory -Force -Path $expRoot | Out-Null
 
@@ -66,7 +67,7 @@ end
 "@
 [System.IO.File]::WriteAllText($buildConfPath, $buildConf, (New-Object System.Text.UTF8Encoding($false)))
 
-$vcvars = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat'
+$vcvars = Get-TestPath 'vs_devcmd'
 $buildCmdPath = Join-Path $expRoot 'run_build.cmd'
 $buildCmd = @"
 @echo off

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-base="$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
 export DOTNET_ROOT="$base/dotnet"
 export PATH="$DOTNET_ROOT:$PATH"
 cd "$base/project"

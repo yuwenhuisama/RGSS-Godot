@@ -1,6 +1,6 @@
-absolute_ogg = 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.ogg'
-absolute_wav = 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.wav'
-absolute_wav44 = 'E:/Projects/RGSS-Godot/.omo/compatibility-run-tmp/e08-se-original/tone44.wav'
+absolute_ogg = TestPaths.fixture('audio/tone.ogg')
+absolute_wav = TestPaths.fixture('audio/tone.wav')
+absolute_wav44 = File.join(TestPaths.repo('.omo/compatibility-run-tmp/e08-se-original'), 'tone44.wav')
 events = File.open('se_format_events.tsv', 'w')
 
 def stamp(events, name, extra = nil)

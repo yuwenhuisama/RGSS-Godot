@@ -1,15 +1,17 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 $destination = Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/e05-battle-animation-original'
-Get-ChildItem 'E:/Projects/RMProject/Data/*.rvdata2' | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
+Get-ChildItem (Join-Path (Get-TestPath 'game_project') 'Data/*.rvdata2') | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
 New-Item -ItemType Directory -Force (Join-Path $destination 'Graphics/System') | Out-Null
-Copy-Item 'F:/Softwares/RPG Maker VX Ace/RTP/Graphics/System/Window.png' (Join-Path $destination 'Graphics/System/Window.png') -Force
+Copy-Item (Join-Path (Get-TestPath 'rtp') 'Graphics/System/Window.png') (Join-Path $destination 'Graphics/System/Window.png') -Force
 Set-Location $destination
 $refresh = @'
 require 'zlib'
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
 fixture = File.read('../../../tests/fixtures/battle_animation_reference.rb')
 wrapper = "begin\n" + fixture + "\nrescue SystemExit\nraise\nrescue Exception => error\nFile.open('battle_animation_error.txt','w') { |file| file.puts error.class,error.message,error.backtrace }; exit\nend\n"
 scripts = Marshal.load(File.binread('Data/Scripts.rvdata2'))
-scripts[-1][2] = Zlib::Deflate.deflate(wrapper)
+scripts[-1][2] = Zlib::Deflate.deflate(TestPathsConfig.fixture_source(wrapper))
 File.binwrite('Data/Scripts.rvdata2', Marshal.dump(scripts))
 '@
 $refresh | ruby

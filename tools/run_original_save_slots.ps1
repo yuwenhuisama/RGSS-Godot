@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 $destination = Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/f03-save-slots-original'
-Get-ChildItem 'E:/Projects/RMProject/Data/*.rvdata2' | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
+Get-ChildItem (Join-Path (Get-TestPath 'game_project') 'Data/*.rvdata2') | Where-Object Name -ne 'Scripts.rvdata2' | Copy-Item -Destination (Join-Path $destination 'Data')
 Set-Location $destination
 $process = Start-Process ./Game.exe -PassThru -Wait
 Write-Output "ORIGINAL_EXIT:$($process.ExitCode)"

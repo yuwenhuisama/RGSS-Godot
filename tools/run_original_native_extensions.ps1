@@ -1,9 +1,11 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 Set-Location (Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/f08-native-original')
 $refresh = @'
 require 'zlib'
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
 fixture = File.read('../../../tests/fixtures/native_extensions_reference.rb')
-File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(fixture)]]))
+File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(TestPathsConfig.fixture_source(fixture))]]))
 '@
 $refresh | ruby
 if ($LASTEXITCODE -ne 0) { throw 'Native extension fixture refresh failed' }

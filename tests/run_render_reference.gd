@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Requires a real GPU renderer. Saves the same fixture's RGBA as original RMVA.
 var _driver
 
@@ -12,7 +14,7 @@ func _run() -> void:
 	root.add_child(host)
 	_driver.Initialize(host)
 	var ok: bool = _driver.RunRuby("require 'color'; require 'tone'; require 'rect'; require 'font'; require 'bitmap'; require 'graphics'; require 'viewport'; require 'sprite'; require 'window'; require 'plane'")
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot")
+	var output := TestPaths.output()
 	DirAccess.make_dir_recursive_absolute(output)
 	var fixture := "render_reference.rb"
 	if "--text" in OS.get_cmdline_user_args():
@@ -96,21 +98,21 @@ func _run() -> void:
 	if "--tiles" in OS.get_cmdline_user_args():
 		fixture = "tilemap_reference.rb"
 		ok = _driver.RunRuby("require 'table'; require 'tilemap'") and ok
-	var code := FileAccess.get_file_as_string("res://tests/fixtures/" + fixture).trim_suffix("exit\n")
+	var code := FileAccess.get_file_as_string(TestPaths.fixture(fixture)).trim_suffix("exit\n")
 	if "--tile-scroll" in OS.get_cmdline_user_args():
 		fixture = "tilemap_scroll_reference.rb"
 		ok = _driver.RunRuby("require 'table'; require 'tilemap'") and ok
-		code = FileAccess.get_file_as_string("res://tests/fixtures/" + fixture).trim_suffix("exit\n")
+		code = FileAccess.get_file_as_string(TestPaths.fixture(fixture)).trim_suffix("exit\n")
 	if "--record-transition" in OS.get_cmdline_user_args():
 		Engine.max_fps = 60
 	if "--tile-table-edge" in OS.get_cmdline_user_args():
 		fixture = "tilemap_table_edge_reference.rb"
 		ok = _driver.RunRuby("require 'table'; require 'tilemap'") and ok
-		code = FileAccess.get_file_as_string("res://tests/fixtures/" + fixture).trim_suffix("exit\n")
+		code = FileAccess.get_file_as_string(TestPaths.fixture(fixture)).trim_suffix("exit\n")
 	if "--tile-occlusion" in OS.get_cmdline_user_args():
 		fixture = "tilemap_occlusion_reference.rb"
 		ok = _driver.RunRuby("require 'table'; require 'tilemap'") and ok
-		code = FileAccess.get_file_as_string("res://tests/fixtures/" + fixture).trim_suffix("exit\n")
+		code = FileAccess.get_file_as_string(TestPaths.fixture(fixture)).trim_suffix("exit\n")
 	if "--record-transition" in OS.get_cmdline_user_args():
 		Engine.max_fps = 60
 		code = "$record_transition_video=true\n" + code
@@ -124,7 +126,7 @@ func _run() -> void:
 		code = "$tilemap_probe_tables=true\n" + code
 	if "--tile-render" in OS.get_cmdline_user_args():
 		code = "$tilemap_probe_render=true\n" + code
-	code = "$rgss_compat_output = " + JSON.stringify(output) + "\n$reference_fiber = Fiber.new do\n" + code + "\nend"
+	code = "$rgss_compat_output = " + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + "$reference_fiber = Fiber.new do\n" + code + "\nend"
 	ok = ok and _driver.RunRuby(code)
 	var graphics_frames := 140 if fixture == "tilemap_scroll_reference.rb" else 120 if fixture in ["tilemap_reference.rb", "tilemap_table_edge_reference.rb", "tilemap_occlusion_reference.rb"] else 1930 if "--record-transition" in OS.get_cmdline_user_args() else 130 if "--transition-render" in OS.get_cmdline_user_args() else 40 if fixture in ["graphics_reference.rb", "graphics_transition_reference.rb", "graphics_frame_reference.rb", "graphics_resize_reference.rb"] else 0
 	for i in range(graphics_frames if graphics_frames > 0 else 552 if fixture == "window_animation_reference.rb" else 170 if fixture == "window_cursor_reference.rb" else 140 if fixture == "plane_reference.rb" else 100 if fixture in ["sprite_effect_reference.rb", "sprite_opacity_reference.rb", "sprite_flash_duration_reference.rb"] else 86 if fixture == "window_animation_render_reference.rb" else 68 if fixture == "viewport_reference.rb" else 62 if fixture in ["plane_sampling_reference.rb", "window_reference.rb"] else 52 if fixture in ["viewport_sort_reference.rb", "viewport_flash_reference.rb"] else 44 if fixture in ["sprite_wave_reference.rb", "sprite_wave_boundary_reference.rb"] else 36 if fixture in ["sprite_region_reference.rb", "sprite_rotation_update_reference.rb", "sprite_layer_reference.rb", "viewport_layer_reference.rb", "sprite_rotated_effect_reference.rb"] else 30 if fixture == "window_border_reference.rb" else 20 if fixture in ["sprite_sort_reference.rb", "viewport_value_reference.rb", "viewport_overlap_reference.rb", "plane_precision_reference.rb", "window_arrows_reference.rb"] else 10):
@@ -169,13 +171,13 @@ func _run() -> void:
 			push_error("Tilemap source quarters differ from the 7296 original RGSS300 rows")
 	if ok and fixture == "graphics_resize_reference.rb":
 		var actual := FileAccess.get_file_as_string(output.path_join("graphics_resize_reference.tsv"))
-		var expected := FileAccess.get_file_as_string("res://tests/fixtures/rgss300-graphics-resize-reference.tsv")
+		var expected := FileAccess.get_file_as_string(TestPaths.fixture("rgss300-graphics-resize-reference.tsv"))
 		ok = actual.replace("\r\n", "\n") == expected
 		if not ok:
 			push_error("Graphics resize differs from original RGSS300")
 	if ok and fixture == "graphics_frame_reference.rb":
 		var actual := FileAccess.get_file_as_string(output.path_join("graphics_frame_reference.tsv"))
-		var expected := FileAccess.get_file_as_string("res://tests/fixtures/rgss300-graphics-frame-reference.tsv")
+		var expected := FileAccess.get_file_as_string(TestPaths.fixture("rgss300-graphics-frame-reference.tsv"))
 		ok = actual.replace("\r\n", "\n") == expected
 		if not ok:
 			push_error("Graphics frame timing differs from original RGSS300")

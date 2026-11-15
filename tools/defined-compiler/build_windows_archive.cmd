@@ -1,5 +1,8 @@
 @echo off
-call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+setlocal
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -Command ". '%~dp0..\test_paths.ps1'; Get-TestPath 'vs_devcmd'"`) do set "VCVARS=%%I"
+if not defined VCVARS exit /b 1
+call "%VCVARS%"
 if errorlevel 1 exit /b %errorlevel%
 if "%~2"=="shared" goto shared
 cd /d "%~1\mruby"

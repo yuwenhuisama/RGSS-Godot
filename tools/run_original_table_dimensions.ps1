@@ -1,10 +1,12 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 Set-Location (Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/f01-table-dimensions-original')
 $refresh = @'
 require 'zlib'
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
 fixture = File.read('../../../tests/fixtures/table_dimensions_reference.rb')
 wrapper = "begin\n" + fixture + "\nrescue SystemExit\nraise\nrescue Exception => error\nFile.open('table_dimensions_error.txt','w') { |file| file.puts error.class,error.message,error.backtrace }; exit\nend\n"
-File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(wrapper)]]))
+File.binwrite('Data/Scripts.rvdata2', Marshal.dump([[1, 'Compatibility', Zlib::Deflate.deflate(TestPathsConfig.fixture_source(wrapper))]]))
 '@
 $refresh | ruby
 if ($LASTEXITCODE -ne 0) { throw 'Table dimensions refresh failed' }

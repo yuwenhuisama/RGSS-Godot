@@ -1,5 +1,10 @@
 # Verification tools
 
+All machine inputs use the ignored root `.test-paths.local.json`; copy the
+tracked `.test-paths.example.json` and fill only the inputs needed locally.
+See `docs/compatibility/test-path-configuration.md`. Repository fixtures derive
+from the checkout and are not configured with an absolute repository path.
+
 `run_tests.gd` is the contract suite entry. Read `tests/AGENTS.md` and
 `docs/compatibility/current-status.md` for platform and fixture requirements.
 `check_submission.ps1` parses PowerShell and Bash tools without executing
@@ -12,10 +17,10 @@ in the files. `audio-loopback/Program.cs.txt` is intentional C# source selected
 explicitly by its separate csproj, not a generated capture.
 
 Most `run_linux_*`, `prepare_macos_*`, capture/deploy and older per-gem build
-scripts are recorded workstation harnesses. They deliberately retain the
-original machine paths, container mount layout and evidence directory names
-used for the measurements. They may require the local
-`rgss-linux-godot-verified:local` image or prior `.omo/evidence` build outputs;
+scripts are recorded experiment harnesses. Machine inputs now come from the
+local test configuration; container mount layout and evidence directory names
+remain the recorded execution contracts. They may require the configured
+Linux build image or prior `.omo/evidence` build outputs;
 these are not standalone clean-clone build entrypoints. Read each script's
 inputs before running it. They are retained so the recorded experiment can
 be reproduced in its original environment, not as portable release tooling.

@@ -1,9 +1,10 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root '.omo/evidence/c12-runner-lifetime-60hz'
 if (Test-Path $work) { throw 'Evidence already exists' }
 New-Item -ItemType Directory -Path $work | Out-Null
-$process = Start-Process 'E:/Godot/Godot_v4.6.1-stable_mono_win64_console.exe' -ArgumentList @('--windowed', '--path', $root, '-s', 'tests/test_original_fullscreen.gd', '--', '--interactive', '--control-dir', $work, '--logical-size', '544x416') -WorkingDirectory $root -RedirectStandardOutput (Join-Path $work 'stdout.log') -RedirectStandardError (Join-Path $work 'stderr.log') -PassThru
+$process = Start-Process (Get-TestPath 'godot') -ArgumentList @('--windowed', '--path', $root, '-s', 'tests/test_original_fullscreen.gd', '--', '--interactive', '--control-dir', $work, '--logical-size', '544x416') -WorkingDirectory $root -RedirectStandardOutput (Join-Path $work 'stdout.log') -RedirectStandardError (Join-Path $work 'stderr.log') -PassThru
 $null = $process.Handle
 try {
     if ($process.WaitForExit(90000)) { throw "Runner exited before lifetime boundary: $($process.ExitCode)" }

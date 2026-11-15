@@ -1,11 +1,14 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Public Ruby SE playback measured at the real mixer, rather than pool internals.
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	Engine.max_fps = 60
+	TestPaths.required("rtp")
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
 	var host := Node.new()
 	root.add_child(host)
@@ -15,7 +18,7 @@ func _run() -> void:
 	var capture := AudioEffectCapture.new()
 	capture.buffer_length = 1.0
 	AudioServer.add_bus_effect(0, capture)
-	var tone := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.wav")
+	var tone := TestPaths.fixture("audio/tone.wav")
 	var ok: bool = driver.RunRuby("require 'audio'; Audio.se_play(" + JSON.stringify(tone) + ",20,100); Audio.se_play(" + JSON.stringify(tone) + ",20,150)")
 	for frame in range(12):
 		await process_frame

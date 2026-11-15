@@ -1,5 +1,5 @@
 output = $rgss_compat_output || '.'
-source = $rpg_database_source || 'E:/Projects/RMProject/Data'
+source = $rpg_database_source || TestPaths.game('Data')
 canonical = nil
 canonical = lambda do |value|
   if value.is_a?(String)

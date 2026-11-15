@@ -1,14 +1,16 @@
-param([string]$FixtureName = 'e07-midi-me-signal-original', [string]$Device = 'Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)')
+param([string]$FixtureName = 'e07-midi-me-signal-original', [string]$Device)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
+if (!$Device) { $Device = Get-TestSetting 'audio_device' }
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root ('.omo/compatibility-run-tmp/' + $FixtureName)
-& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') 'E:/Projects/RMProject' $work (Join-Path $root 'tests/fixtures/midi_me_signal_reference.rb')
+& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') (Get-TestPath 'game_project') $work (Join-Path $root 'tests/fixtures/midi_me_signal_reference.rb')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $capture = Join-Path $work 'midi-me-capture.wav'
 $log = Join-Path $work 'capture-stderr.log'
 $arguments = '-hide_banner -loglevel info -thread_queue_size 512 -f dshow -audio_buffer_size 50 -i "audio=' + $Device + '" -t 16 -ac 2 -ar 48000 -y "' + $capture + '"'
 $started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
-$recording = Start-Process 'F:/Softwares/oopz/ffmpeg.exe' -ArgumentList $arguments -RedirectStandardError $log -RedirectStandardOutput (Join-Path $work 'capture-stdout.log') -PassThru -NoNewWindow
+$recording = Start-Process (Get-TestPath 'ffmpeg') -ArgumentList $arguments -RedirectStandardError $log -RedirectStandardOutput (Join-Path $work 'capture-stdout.log') -PassThru -NoNewWindow
 $null = $recording.Handle
 $game = Start-Process (Join-Path $work 'Game.exe') -WorkingDirectory $work -PassThru -Wait
 $recording.WaitForExit()

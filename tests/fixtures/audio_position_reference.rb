@@ -2,7 +2,7 @@ output = $rgss_compat_output || '.'
 Graphics.frame_rate = 60
 File.open(File.join(output, 'audio_position_reference.tsv'), 'w') do |file|
   ['wav', 'ogg', 'wma'].each do |extension|
-    path = 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.' + extension
+    path = TestPaths.fixture('audio/tone.' + extension)
     Audio.bgm_stop
     Audio.bgm_play(path, 80, 100, 0)
     3.times do |step|
@@ -18,7 +18,7 @@ File.open(File.join(output, 'audio_position_reference.tsv'), 'w') do |file|
     file.flush
     Audio.bgm_stop
   end
-  Audio.bgm_play('F:/Softwares/RPG Maker VX Ace/RTP/Audio/BGM/Theme1.ogg', 80, 100, 0)
+  Audio.bgm_play(TestPaths.rtp('Audio/BGM/Theme1.ogg'), 80, 100, 0)
   60.times { Graphics.update }
   3.times do |step|
     60.times { Graphics.update }

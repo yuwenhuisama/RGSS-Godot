@@ -9,7 +9,7 @@ bitmap.blt(0,0,source,Rect.new(0,0,4,4))
 bitmap.blt(-1,0,source,Rect.new(28,0,4,4))
 bitmap.blt(0,-1,source,Rect.new(0,28,4,4))
 bitmap.blt(-1,-1,source,Rect.new(28,28,4,4))
-File.open('cursor_cache_reference.tsv','w') do |file|
+File.open(TestPaths.output('cursor_cache_reference.tsv'),'w') do |file|
   3.times do |y|
     3.times do |x|
       c=bitmap.get_pixel(x,y)

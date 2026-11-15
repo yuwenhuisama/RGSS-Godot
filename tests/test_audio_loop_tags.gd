@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -11,9 +13,9 @@ func _run() -> void:
 	driver.Initialize(host)
 	var audio=load("res://Scripts/AudioFormatTestDriver.cs").new()
 	audio.Initialize(host)
-	var output:=ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/audio-loop-tags")
+	var output:=TestPaths.output("audio-loop-tags")
 	DirAccess.make_dir_recursive_absolute(output)
-	var code:="$audio_loop_tags_host=true; $rgss_compat_output="+JSON.stringify(output)+"; require 'audio'; require 'graphics'; $loop_tags=Fiber.new do\n"+FileAccess.get_file_as_string("res://tests/fixtures/audio_loop_tags_reference.rb")+"\nend"
+	var code:="$audio_loop_tags_host=true; $rgss_compat_output="+JSON.stringify(output)+"; require 'audio'; require 'graphics'; $loop_tags=Fiber.new do\n"+TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("audio_loop_tags_reference.rb"))+"\nend"
 	var ok: bool=driver.RunRuby(code)
 	for frame in range(302):
 		ok=driver.RunRuby("$loop_tags.resume if $loop_tags.alive?") and ok

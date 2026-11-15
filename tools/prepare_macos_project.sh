@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
+cd "$base"
 mkdir project
 tar -xf mac-project-input.tar.gz -C project
 mkdir -p project/Plugins/macos/audio project/.omo/evidence

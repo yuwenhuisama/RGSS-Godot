@@ -1,7 +1,8 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $destination = Join-Path $root '.omo/compatibility-run-tmp/cursor-tail-original'
-& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') 'E:/Projects/RMProject' $destination (Join-Path $root 'tests/fixtures/cursor_tail_reference.rb')
+& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') (Get-TestPath 'game_project') $destination (Join-Path $root 'tests/fixtures/cursor_tail_reference.rb')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $process = Start-Process (Join-Path $destination 'Game.exe') -WorkingDirectory $destination -PassThru -Wait
 if ($process.ExitCode -ne 0) { exit $process.ExitCode }

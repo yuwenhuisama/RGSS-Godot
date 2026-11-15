@@ -1,8 +1,9 @@
 param([string]$Name = 'd05-original-native-input')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $root ('.omo/compatibility-run-tmp/' + $Name)
-& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') 'E:/Projects/RMProject' $work (Join-Path $root 'tests/fixtures/message_original_input_reference.rb') --stock-scripts
+& ruby (Join-Path $PSScriptRoot 'prepare_original_fixture.rb') (Get-TestPath 'game_project') $work (Join-Path $root 'tests/fixtures/message_original_input_reference.rb') --stock-scripts
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $watch = New-Object System.IO.FileSystemWatcher $work, 'message_input_ready.txt'
 $subscription = Register-ObjectEvent $watch Created -SourceIdentifier 'D05InputReady'

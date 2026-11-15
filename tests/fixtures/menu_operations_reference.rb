@@ -229,13 +229,13 @@ end
 unless $d07_host
   output = Dir.pwd
   begin
-    Dir.chdir('E:/Projects/RMProject')
+    Dir.chdir(TestPaths.game)
     module Cache
       class << self
         alias d07_original_load_bitmap load_bitmap
         def load_bitmap(folder, filename, hue = 0)
           unless filename.empty? || File.exist?(folder + filename + '.png')
-            folder = 'F:/Softwares/RPG Maker VX Ace/RTP/' + folder
+            folder = TestPaths.rtp(folder)
           end
           d07_original_load_bitmap(folder, filename, hue)
         end
@@ -245,7 +245,7 @@ unless $d07_host
       class << self
         alias d07_original_se_play se_play
         def se_play(filename, volume = 100, pitch = 100)
-          filename = 'F:/Softwares/RPG Maker VX Ace/RTP/' + filename unless File.exist?(filename + '.ogg') || File.exist?(filename + '.wav')
+          filename = TestPaths.rtp(filename) unless File.exist?(filename + '.ogg') || File.exist?(filename + '.wav')
           d07_original_se_play(filename, volume, pitch)
         end
       end

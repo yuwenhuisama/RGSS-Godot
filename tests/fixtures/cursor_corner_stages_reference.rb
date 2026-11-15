@@ -1,6 +1,6 @@
 background=Bitmap.new(544,416)
 sprite=Sprite.new;sprite.bitmap=background
-File.open('cursor_corner_stages_reference.tsv','w') do |file|
+File.open(TestPaths.output('cursor_corner_stages_reference.tsv'),'w') do |file|
   [0,255].each do |bg|
     background.fill_rect(background.rect,Color.new(bg,bg,bg))
     4.times do |stage|

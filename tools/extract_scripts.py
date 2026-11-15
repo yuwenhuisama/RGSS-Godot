@@ -2,6 +2,10 @@
 # Extract RPG Maker VX Ace Scripts.rvdata2 (Ruby Marshal 4.8 dump of an Array of
 # [section_id:Integer, name:String, deflated_code:String]) into readable .rb files.
 import sys, os, zlib, re
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_paths
 
 class MarshalReader:
     def __init__(self, data):
@@ -60,8 +64,8 @@ class MarshalReader:
         raise ValueError(f"unhandled marshal type {typ!r} at {self.i}")
 
 def main():
-    src = r"E:\Projects\RMProject\Data\Scripts.rvdata2"
-    out = r"E:\Projects\RGSS-Godot\docs\rmva-scripts"
+    src = test_paths.path("game_project") / "Data" / "Scripts.rvdata2"
+    out = test_paths.repo_path("docs/rmva-scripts")
     os.makedirs(out, exist_ok=True)
     data = open(src, 'rb').read()
     assert data[0] == 4 and data[1] == 8, "not a Marshal 4.8 stream"

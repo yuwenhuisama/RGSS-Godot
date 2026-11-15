@@ -1,10 +1,13 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	for frame in range(180):
 		await process_frame
@@ -13,9 +16,9 @@ func _run() -> void:
 	for frame in range(90):
 		await process_frame
 		await RenderingServer.frame_post_draw
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/battle-animation-pixels")
+	var output := TestPaths.output("battle-animation-pixels")
 	DirAccess.make_dir_recursive_absolute(output)
-	var code := "$battle_animation_pixels_host=true; $rgss_compat_output=" + JSON.stringify(output) + "; $animation_pixel_probe=Fiber.new do\n" + FileAccess.get_file_as_string("res://tests/fixtures/battle_animation_pixels_reference.rb") + "\nend"
+	var code := "$battle_animation_pixels_host=true; $rgss_compat_output=" + JSON.stringify(output) + "; $animation_pixel_probe=Fiber.new do\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("battle_animation_pixels_reference.rb")) + "\nend"
 	var ok: bool = driver.RunRuby(code) and scene_ready
 	for frame in range(34):
 		ok = driver.RunRuby("$animation_pixel_probe.resume if $animation_pixel_probe.alive?") and ok

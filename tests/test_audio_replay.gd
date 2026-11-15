@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -11,13 +13,13 @@ func _run() -> void:
 	driver.Initialize(host)
 	var audio_driver = load("res://Scripts/AudioFormatTestDriver.cs").new()
 	audio_driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/audio-replay")
+	var output := TestPaths.output("audio-replay")
 	DirAccess.make_dir_recursive_absolute(output)
 	var path := output.path_join("audio_replay_reference.tsv")
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
-	var tone := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.ogg")
-	var code := "require 'graphics'; require 'audio'; $audio_replay_host=true; $audio_replay_tone=" + JSON.stringify(tone) + "; $rgss_compat_output=" + JSON.stringify(output) + "; $audio_replay_probe=Fiber.new do\n" + FileAccess.get_file_as_string("res://tests/fixtures/audio_replay_reference.rb") + "\nend"
+	var tone := TestPaths.fixture("audio/tone.ogg")
+	var code := "require 'graphics'; require 'audio'; $audio_replay_host=true; $audio_replay_tone=" + JSON.stringify(tone) + "; $rgss_compat_output=" + JSON.stringify(output) + "; $audio_replay_probe=Fiber.new do\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("audio_replay_reference.rb")) + "\nend"
 	var ok: bool = driver.RunRuby(code)
 	for frame in range(228):
 		ok = driver.RunRuby("$audio_replay_probe.resume if $audio_replay_probe.alive?") and ok

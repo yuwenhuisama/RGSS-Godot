@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
+cd "$base"
 mkdir -p downloads dotnet godot
 curl -fL https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-osx-arm64.tar.gz -o downloads/dotnet-sdk.tar.gz
 printf '%s  %s\n' c2930ce6363417165142e5610992df1430b1cf93f4b5ac31027da611a6bc089a73e7062eed0200be3e4a32db893a92c86fc27816a53521e5b041aafba0aa1215 downloads/dotnet-sdk.tar.gz | shasum -a 512 -c -

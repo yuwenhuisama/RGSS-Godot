@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 var driver
 
 func _initialize() -> void:
@@ -12,13 +14,14 @@ func frames(count: int) -> void:
 
 func _run() -> void:
 	driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	var ok: bool = driver.RunRuby("raise 'title not ready' unless SceneManager.scene.is_a?(Scene_Title); DataManager.setup_new_game; SceneManager.goto(Scene_Map)")
 	await frames(180)
 	ok = ok and driver.RunRuby("raise 'map not ready' unless SceneManager.scene.is_a?(Scene_Map)")
 	var baseline := Vector3i(driver.GetViewportCount(), driver.GetSpriteCount(), driver.GetWindowCount())
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/menu")
+	var output := TestPaths.output("menu")
 	DirAccess.make_dir_recursive_absolute(output)
 	root.get_texture().get_image().save_png(output.path_join("map_before.png"))
 	for cycle in range(3):

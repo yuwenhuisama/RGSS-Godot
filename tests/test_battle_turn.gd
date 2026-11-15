@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 var driver
 var ok := true
 
@@ -25,12 +27,13 @@ func tap(code: Key) -> void:
 
 func _run() -> void:
 	driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	check("DataManager.setup_new_game; SceneManager.goto(Scene_Map)")
 	await frames(180)
 	var baseline := Vector3i(driver.GetViewportCount(),driver.GetSpriteCount(),driver.GetWindowCount())
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/battle-turn")
+	var output := TestPaths.output("battle-turn")
 	DirAccess.make_dir_recursive_absolute(output)
 	var reaction := "counter" if "--counter" in OS.get_cmdline_user_args() else "reflection" if "--reflection" in OS.get_cmdline_user_args() else ""
 	var item_probe := "--item" in OS.get_cmdline_user_args()

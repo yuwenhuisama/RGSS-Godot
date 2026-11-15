@@ -1,10 +1,10 @@
 output = $rgss_compat_output || '.'
 File.open(File.join(output,'audio_seek_units_reference.tsv'),'w') do |file|
   ['ogg','wav','wma','mid'].each do |format|
-    path = format == 'mid' ? 'E:/Projects/RGSS-Godot/tests/fixtures/midi-reference.mid' : 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.' + format
+    path = format == 'mid' ? TestPaths.fixture('midi-reference.mid') : TestPaths.fixture('audio/tone.' + format)
     [4096,8192].each do |position|
       if format == 'mid'
-        Audio.bgm_play('E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.ogg',0,100,4096)
+        Audio.bgm_play(TestPaths.fixture('audio/tone.ogg'),0,100,4096)
         Graphics.update
       end
       Audio.bgm_stop

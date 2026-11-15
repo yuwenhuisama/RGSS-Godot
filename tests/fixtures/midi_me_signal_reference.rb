@@ -1,6 +1,6 @@
 output = $rgss_compat_output || '.'
-midi = 'E:/Projects/RGSS-Godot/tests/fixtures/midi-reference.mid'
-tone = 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.ogg'
+midi = TestPaths.fixture('midi-reference.mid')
+tone = TestPaths.fixture('audio/tone.ogg')
 Graphics.frame_rate = 60
 File.open(File.join(output, 'midi_me_signal_events.tsv'), 'w') do |file|
   mark = proc do |name|

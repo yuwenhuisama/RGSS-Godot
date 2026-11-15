@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -49,9 +51,9 @@ end
 File.delete(binary_path)
 """
 	var ok: bool = driver.RunRuby(code)
-	ok = driver.RunRuby("$file_binary_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/file_binary_reference.rb")) and ok
+	ok = driver.RunRuby("$file_binary_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("file_binary_reference.rb"))) and ok
 	var actual := FileAccess.get_file_as_string(output.path_join("file_binary.tsv")).replace("\r\n", "\n").strip_edges()
-	var expected := FileAccess.get_file_as_string("res://tests/fixtures/file_binary_original.tsv").replace("\r\n", "\n").strip_edges()
+	var expected := FileAccess.get_file_as_string(TestPaths.fixture("file_binary_original.tsv")).replace("\r\n", "\n").strip_edges()
 	if expected.is_empty() or actual != expected:
 		push_error("File binary encoding differs from RGSS300: " + actual)
 		ok = false

@@ -1,8 +1,9 @@
 param([string]$FixtureName = 'e07-wasapi-midi-me-original', [switch]$InspectSessions, [string]$DeviceId = '', [switch]$Activate, [string]$FixtureScript = 'tests/fixtures/midi_me_signal_reference.rb')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../test_paths.ps1')
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $work = Join-Path $root ('.omo/compatibility-run-tmp/' + $FixtureName)
-& ruby (Join-Path $root 'tools/prepare_original_fixture.rb') 'E:/Projects/RMProject' $work (Join-Path $root $FixtureScript)
+& ruby (Join-Path $root 'tools/prepare_original_fixture.rb') (Get-TestPath 'game_project') $work (Join-Path $root $FixtureScript)
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $exe = Join-Path $PSScriptRoot 'bin/Release/net8.0-windows/AudioLoopback.exe'
 $captureArgs = @((Join-Path $work 'capture.wav'), '16')

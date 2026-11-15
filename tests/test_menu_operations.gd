@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # D07 menu operations: drives the stock Scene_Menu / Scene_Item / Scene_Skill /
 # Scene_Equip / Scene_Status handlers with real Godot InputEventKey events.
 # The shared fixture is also executed by the isolated original RGSS300 runtime;
@@ -104,17 +106,18 @@ func equip_state(actor: int) -> String:
 	return "$game_actors[%d].equips.map {|e| e ? e.id : 0 } + [$game_party.item_number($data_weapons[1]),$game_party.item_number($data_weapons[2]),$game_party.item_number($data_armors[1]),$game_party.item_number($data_armors[2]),$game_party.item_number($data_armors[46])]" % actor
 
 func _run() -> void:
-	output = ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/menu-operations")
+	output = TestPaths.output("menu-operations")
 	DirAccess.make_dir_recursive_absolute(output)
 	error_path = output.path_join("d07-menu-error.txt")
 	for name in ["menu_operations_reference.tsv", "menu_operations_scenes.tsv", "d07-menu-error.txt"]:
 		if FileAccess.file_exists(output.path_join(name)):
 			DirAccess.remove_absolute(output.path_join(name))
 	driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 
-	var fixture := FileAccess.get_file_as_string("res://tests/fixtures/menu_operations_reference.rb")
+	var fixture := TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("menu_operations_reference.rb"))
 	var setup := "$d07_host = true\n" + fixture + "\nD07Menu.prepare(" + JSON.stringify(output) + ")\nD07Menu.data_ops"
 	if ruby(setup, "fixture-data-ops"):
 		compare_rows("menu_operations_reference.tsv", DATA_ROWS, "data")

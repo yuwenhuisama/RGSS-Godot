@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # D03 player/vehicle interaction contract. The fixture runs the stock
 # Game_Player/Game_Followers/Game_Follower/Game_Vehicle/Game_Map/Game_Event
 # classes on both engines; this runner replays it inside the booted game VM
@@ -13,11 +15,12 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	for frame in range(180):
 		await process_frame
 		await RenderingServer.frame_post_draw
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/d03-player-vehicle/godot")
+	var output := TestPaths.repo(".omo/evidence/d03-player-vehicle/godot")
 	DirAccess.make_dir_recursive_absolute(output)
 	var actual_path := output.path_join("player_vehicle_reference.tsv")
 	if FileAccess.file_exists(actual_path):
@@ -25,7 +28,7 @@ func _run() -> void:
 	var error_path := output.path_join("player_vehicle_error.txt")
 	if FileAccess.file_exists(error_path):
 		DirAccess.remove_absolute(error_path)
-	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/player_vehicle_reference.rb")
+	var code := "$rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("player_vehicle_reference.rb"))
 	var ok: bool = driver.RunRuby(code)
 	if ok:
 		ok = FileAccess.file_exists(actual_path)

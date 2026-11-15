@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Real audio loader contract for B09 (WMA) and E08 (RTP path fallback).
 # Run: godot --headless --path . -s tests/test_audio_formats.gd
 #
@@ -8,9 +10,7 @@ extends SceneTree
 #   ffmpeg -f lavfi -i sine=frequency=440:duration=0.5 -c:a pcm_s16le tone.wav
 #   ffmpeg -f lavfi -i sine=frequency=440:duration=0.5 -c:a libvorbis  tone.ogg
 #   ffmpeg -f lavfi -i sine=frequency=440:duration=0.5 -c:a wmav2      tone.wma
-# WMA uses the bundled platform decoder or an explicit RGSS_FFMPEG_PATH override.
-
-const FFMPEG_FALLBACK := "F:/Softwares/oopz/ffmpeg.exe"
+# WMA uses the bundled platform decoder or an explicit RGSS_TEST_FFMPEG override.
 
 var _driver
 var _root: Node
@@ -57,7 +57,7 @@ func _finish() -> void:
 
 
 func _fixture(file_name: String) -> String:
-	return ProjectSettings.globalize_path("res://tests/fixtures/audio/" + file_name)
+	return TestPaths.fixture("audio/" + file_name)
 
 
 func _expect(condition: bool, message: String) -> void:
@@ -141,16 +141,20 @@ func _check_rtp_fallback() -> void:
 
 func _check_wma_explicit_decoder() -> void:
 	var wma: String = _fixture("tone.wma")
+	var probe_dir: String = ProjectSettings.globalize_path("user://audio_format_probe")
+	DirAccess.make_dir_recursive_absolute(probe_dir)
 
 	var ffmpeg := OS.get_environment("RGSS_TEST_FFMPEG")
+	if ffmpeg.is_empty():
+		var configured = TestPaths.values().get("ffmpeg", "")
+		if configured is String and not configured.strip_edges().is_empty():
+			ffmpeg = TestPaths.required("ffmpeg")
 	if ffmpeg.is_empty():
 		var platform := "windows" if OS.get_name() == "Windows" else "macos" if OS.get_name() == "macOS" else "linux"
 		var executable := "ffmpeg.exe" if platform == "windows" else "ffmpeg"
 		var bundled := ProjectSettings.globalize_path("res://Plugins/" + platform + "/audio/" + executable)
 		if FileAccess.file_exists(bundled):
 			ffmpeg = bundled
-	if ffmpeg.is_empty() and FileAccess.file_exists(FFMPEG_FALLBACK):
-		ffmpeg = FFMPEG_FALLBACK
 	if ffmpeg.is_empty() or not FileAccess.file_exists(ffmpeg):
 		_skips.append("no ffmpeg available for WMA decode")
 	else:
@@ -179,7 +183,7 @@ func _check_wma_explicit_decoder() -> void:
 			_expect(DirAccess.remove_absolute(bundled_cache) == OK, "owned bundled WMA cache removal failed")
 		_expect(_driver.LoadStream(bundled_probe) is AudioStreamWAV, "bundled WMA decoder did not load fresh source")
 	# A explicitly configured unavailable decoder is a real boundary failure.
-	_driver.SetFfmpegPath("C:/CompatibilityMissingDecoder/ffmpeg.exe")
+	_driver.SetFfmpegPath(probe_dir.path_join("missing-decoder/ffmpeg.exe"))
 	_expect(_driver.LoadStream(wma) == null, "missing explicit decoder must fail")
 	_expect("AUDIO_WMA_NO_DECODER" in _driver.GetLastLoadDiagnostic(), "missing explicit no-decoder diagnostic")
 

@@ -1,14 +1,17 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	TestPaths.required("game_project")
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/rpg-database")
+	var output := TestPaths.output("rpg-database")
 	DirAccess.make_dir_recursive_absolute(output)
 	var code := "require 'color'; require 'tone'; require 'table'; require 'ext/dir'; require 'ext/onig_regexp'; require 'ext/dir_glob'; module RPG; end\n"
 	var files := DirAccess.get_files_at("res://RGSS/rpg")
@@ -16,9 +19,9 @@ func _run() -> void:
 	for file in files:
 		if file.ends_with(".rb"):
 			code += "require " + JSON.stringify("rpg/" + file.trim_suffix(".rb")) + "\n"
-	code += "$rpg_database_host=true; $rpg_database_source=File.join(Unity.rmva_project_path, 'RMProject/Data'); $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/rpg_database_reference.rb")
+	code += "$rpg_database_host=true; $rpg_database_source=" + JSON.stringify(TestPaths.required("game_project").path_join("Data")) + "; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("rpg_database_reference.rb"))
 	var ok: bool = driver.RunRuby(code)
-	var expected_rows := FileAccess.get_file_as_string("res://tests/fixtures/rpg_database_original_hashes.tsv").strip_edges().split("\n")
+	var expected_rows := FileAccess.get_file_as_string(TestPaths.fixture("rpg_database_original_hashes.tsv")).strip_edges().split("\n")
 	var compared := 0
 	for row in expected_rows:
 		var fields := row.split("\t")

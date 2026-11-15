@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -8,14 +10,14 @@ func _run() -> void:
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/zlib-stream")
+	var output := TestPaths.output("zlib-stream")
 	DirAccess.make_dir_recursive_absolute(output)
 	var path := output.path_join("zlib_stream_reference.tsv")
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
-	var ok: bool = driver.RunRuby("$zlib_stream_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/zlib_stream_reference.rb"))
+	var ok: bool = driver.RunRuby("$zlib_stream_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("zlib_stream_reference.rb")))
 	var actual := FileAccess.get_file_as_string(path).replace("\r\n", "\n").strip_edges()
-	var expected := FileAccess.get_file_as_string("res://tests/fixtures/zlib_stream_original.tsv").replace("\r\n", "\n").strip_edges()
+	var expected := FileAccess.get_file_as_string(TestPaths.fixture("zlib_stream_original.tsv")).replace("\r\n", "\n").strip_edges()
 	print(actual)
 	ok = ok and not expected.is_empty() and actual == expected
 	driver.Shutdown()

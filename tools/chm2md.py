@@ -19,9 +19,13 @@ import re
 import shutil
 import sys
 from html.parser import HTMLParser
+from pathlib import Path
 
-SRC = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\yuwen\AppData\Local\Temp\opencode\chm_extract"
-DST = sys.argv[2] if len(sys.argv) > 2 else r"E:\Projects\RGSS-Godot\docs\rgss-reference"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_paths
+
+SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+DST = Path(sys.argv[2]) if len(sys.argv) > 2 else test_paths.repo_path("docs/rgss-reference")
 
 BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "dt", "dd", "li", "tr", "pre",
               "ul", "ol", "dl", "table", "div", "hr", "br", "caption", "thead", "tbody"}
@@ -258,6 +262,8 @@ def parse_toc(hhc_path):
 
 
 def main():
+    if SRC is None:
+        raise SystemExit("Usage: chm2md.py extracted-chm-dir [output-dir]")
     if os.path.exists(DST):
         shutil.rmtree(DST)
     os.makedirs(DST, exist_ok=True)

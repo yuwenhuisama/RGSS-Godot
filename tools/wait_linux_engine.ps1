@@ -1,7 +1,8 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $deadline = [DateTime]::UtcNow.AddMinutes(3)
 while ([DateTime]::UtcNow -lt $deadline) {
-    $type = & 'C:/Program Files/Docker/Docker/resources/bin/docker.exe' info --format '{{.OSType}}' 2>$null
+    $type = & (Get-TestPath 'docker') info --format '{{.OSType}}' 2>$null
     if ($LASTEXITCODE -eq 0 -and $type -eq 'linux') {
         Write-Output 'LINUX_ENGINE_READY'
         exit 0

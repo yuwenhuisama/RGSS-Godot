@@ -104,6 +104,9 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	var paths = load("res://tools/test_paths.gd")
+	if FileAccess.file_exists(paths.config_file()):
+		OS.set_environment("RGSS_TEST_PATHS_FILE", paths.config_file())
 	var rendered := "--rendered" in OS.get_cmdline_user_args()
 	var tests := HEADLESS_TESTS.duplicate()
 	if "--events" in OS.get_cmdline_user_args():

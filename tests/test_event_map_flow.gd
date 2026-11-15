@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -10,6 +12,7 @@ func frames(count: int) -> void:
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	root.add_child(load("res://Scenes/Boot.tscn").instantiate())
 	await frames(180)
 	var ok: bool = driver.RunRuby("raise 'title not ready' unless SceneManager.scene.is_a?(Scene_Title); DataManager.setup_new_game; SceneManager.goto(Scene_Map)")
@@ -94,10 +97,10 @@ func _run() -> void:
 	if returned != baseline:
 		push_error("Map animation/transfer changed live resource counts: %s -> %s" % [baseline, returned])
 		ok = false
-	var transfer_base := ProjectSettings.globalize_path("res://.omo/compatibility-run-tmp/event-map-flow")
+	var transfer_base := TestPaths.repo(".omo/compatibility-run-tmp/event-map-flow")
 	DirAccess.make_dir_recursive_absolute(transfer_base.path_join("RMProject/Data"))
 	for map_name in ["Map001.rvdata2", "Map002.rvdata2"]:
-		ok = DirAccess.copy_absolute("E:/Projects/RMProject/Data/Map001.rvdata2", transfer_base.path_join("RMProject/Data/" + map_name)) == OK and ok
+		ok = DirAccess.copy_absolute(TestPaths.required("game_project").path_join("Data/Map001.rvdata2"), transfer_base.path_join("RMProject/Data/" + map_name)) == OK and ok
 	ok = driver.RunRuby("$event_flow_saved_base=$rmva_project_base_path; $rmva_project_base_path=" + JSON.stringify(transfer_base) + "; $game_map.events[$event_flow_id].erase; data=RPG::Event.new(9,5); data.id=$event_flow_id; page=data.pages[0]; page.priority_type=1; page.trigger=0; page.list=[RPG::EventCommand.new(201,0,[0,2,8,5,4,0]),RPG::EventCommand.new(122,0,[$event_flow_counter_id,$event_flow_counter_id,1,0,1]),RPG::EventCommand.new]; $game_map.events[$event_flow_id]=Game_Event.new($game_map.map_id,data); $game_player.set_direction(6); $event_flow_before_cross=$game_variables[$event_flow_counter_id]") and ok
 	var cross_key := InputEventKey.new()
 	cross_key.keycode = KEY_ENTER
@@ -112,7 +115,7 @@ func _run() -> void:
 	ok = driver.RunRuby("raise 'cross-map event did not reach map2' unless $game_map.map_id==2 && $game_player.x==8 && $game_player.y==5 && !$game_player.transfer?; raise 'cross-map event did not resume' unless $game_variables[$event_flow_counter_id]==$event_flow_before_cross+1; raise 'cross-map interpreter remained busy' if $game_map.interpreter.running?; $game_player.reserve_transfer(1,8,5,4)") and ok
 	await frames(180)
 	ok = driver.RunRuby("raise 'cross-map return failed' unless SceneManager.scene.is_a?(Scene_Map) && $game_map.map_id==1 && !$game_player.transfer? && Graphics.brightness==255; $rmva_project_base_path=$event_flow_saved_base") and ok
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/event-flow")
+	var output := TestPaths.output("event-flow")
 	DirAccess.make_dir_recursive_absolute(output)
 	root.get_texture().get_image().save_png(output.path_join("map-after-events.png"))
 	ok = driver.RunRuby("$game_map.events.clear; $event_flow_saved_events.each { |id,event| $game_map.events[id]=event }; $game_player.moveto(*$event_flow_saved_xy[0,2]); $game_player.set_direction($event_flow_saved_xy[2]); $data_system.variables.pop") and ok

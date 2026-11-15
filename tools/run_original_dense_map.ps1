@@ -5,8 +5,9 @@
 # Game.exe once, and copies the produced TSV to tests/fixtures/dense_map_original.tsv.
 # The user's game Data directory is never written.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path -Parent $PSScriptRoot
-$source = 'E:/Projects/RMProject'
+$source = Get-TestPath 'game_project'
 $destination = Join-Path $root '.omo/compatibility-run-tmp/d09-dense-map-original'
 $fixture = Join-Path $root 'tests/fixtures/dense_map_reference.rb'
 $capture = Join-Path $destination 'dense_map_reference.tsv'

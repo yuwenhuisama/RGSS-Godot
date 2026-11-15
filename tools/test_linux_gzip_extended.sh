@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
 cd /tmp/linux-project
 if [[ ${1:-} == production ]]; then
   cp /repo/Plugins/linux/*.so Plugins/linux/
@@ -22,8 +24,11 @@ cp /repo/tests/fixtures/gzip_integrity_reference.rb /repo/tests/fixtures/gzip_in
 dotnet build RGSS-Godot.csproj --no-restore 2>&1 | tee /output/gzip-extended-managed-build.log
 godot=/output/godot/Godot_v4.6.1-stable_mono_linux_x86_64/Godot_v4.6.1-stable_mono_linux.x86_64
 if [[ ${1:-} == suite ]]; then
-  mkdir -p 'E:/Projects/RMProject'
-  ln -s /game-data 'E:/Projects/RMProject/Data'
+  game_project=/tmp/linux-project/RMProject
+  mkdir -p "$game_project"
+  ln -s /game-data "$game_project/Data"
+  export RGSS_TEST_PATHS_FILE=/output/test-paths.local.json
+  printf '{"game_project":"%s"}\n' "$game_project" > "$RGSS_TEST_PATHS_FILE"
   "$godot" --headless --path . -s tools/run_tests.gd 2>&1 | tee /output/linux-base-gzip-extended.log
   grep -q 'TEST_SUITE_PASS:22' /output/linux-base-gzip-extended.log
   printf 'LINUX_GZIP_EXTENDED_BASE_PASS\n'

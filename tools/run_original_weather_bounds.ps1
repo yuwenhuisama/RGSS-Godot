@@ -1,10 +1,12 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/test_paths.ps1"
 Set-Location (Join-Path $PSScriptRoot '../.omo/compatibility-run-tmp/d06-weather-bounds-original')
 $refresh = @'
 require 'zlib'
+require File.join(ENV.fetch('RGSS_TEST_REPO_ROOT'), 'tools/test_paths')
 scripts = Marshal.load(File.binread('Data/Scripts.rvdata2'))
 fixture = File.read('../../../tests/fixtures/weather_bounds_reference.rb')
-scripts[-1][2] = Zlib::Deflate.deflate(fixture)
+scripts[-1][2] = Zlib::Deflate.deflate(TestPathsConfig.fixture_source(fixture))
 File.binwrite('Data/Scripts.rvdata2', Marshal.dump(scripts))
 '@
 $refresh | ruby

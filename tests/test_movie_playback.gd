@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -9,9 +11,9 @@ func _run() -> void:
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var movie := ProjectSettings.globalize_path("res://tests/fixtures/movie-reference.ogv")
+	var movie := TestPaths.fixture("movie-reference.ogv")
 	if "--wide" in OS.get_cmdline_user_args():
-		movie = ProjectSettings.globalize_path("res://tests/fixtures/movie-reference-wide.ogv")
+		movie = TestPaths.fixture("movie-reference-wide.ogv")
 	var ok: bool = driver.RunRuby("require 'graphics'; $movie_returned=false; $movie_fiber=Fiber.new { Graphics.play_movie(" + JSON.stringify(movie) + "); $movie_returned=true }")
 	ok = driver.RunRuby("$movie_fiber.resume") and ok
 	ok = driver.RunRuby("raise 'movie must wait' if $movie_returned") and ok

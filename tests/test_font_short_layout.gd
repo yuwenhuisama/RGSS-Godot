@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -8,9 +10,9 @@ func _run() -> void:
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot")
+	var output := TestPaths.output()
 	var code := "require 'color'; require 'tone'; require 'rect'; require 'font'; require 'bitmap'; $rgss_compat_output=" + JSON.stringify(output) + "\n"
-	code += FileAccess.get_file_as_string("res://tests/fixtures/font_short_layout_reference.rb").trim_suffix("exit\n")
+	code += TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("font_short_layout_reference.rb")).trim_suffix("exit\n")
 	var ok: bool = driver.RunRuby(code)
 	if ok:
 		var actual := FileAccess.get_file_as_string(output.path_join("font_short_layout_reference.tsv")).replace("\r\n", "\n").strip_edges()

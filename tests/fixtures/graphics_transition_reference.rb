@@ -35,7 +35,7 @@ Graphics.wait(600) if $record_transition_video
 Graphics.freeze
 bitmap.fill_rect(bitmap.rect,Color.new(20,180,240,255))
 $capture_transition=true;$transition_mode='mask'
-Graphics.transition(($record_transition_video || $capture_transition_pixels) ? 60 : 8,'F:/Softwares/RPG Maker VX Ace/RTP/Graphics/System/BattleStart.png',40)
+Graphics.transition(($record_transition_video || $capture_transition_pixels) ? 60 : 8,TestPaths.rtp('Graphics/System/BattleStart.png'),40)
 $capture_transition=false
 snap=Graphics.snap_to_bitmap;c=snap.get_pixel(272,208);$transition_rows << ['mask_end',c.red,c.green,c.blue,c.alpha];snap.dispose
 2.times {Graphics.update}

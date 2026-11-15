@@ -10,8 +10,11 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(r"E:/Projects/RGSS-Godot")
-SOURCE_GAME = Path(r"E:/Projects/RMProject")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import test_paths
+
+ROOT = test_paths.repo_path()
+SOURCE_GAME = test_paths.path("game_project")
 WORK = ROOT / ".omo" / "compatibility-run-tmp" / "e08-se-original"
 FIXTURE = WORK / "fixture"
 FIXTURE_SCRIPT = ROOT / "tools" / "se-original-capture" / "se_signal_reference.rb"
@@ -20,8 +23,8 @@ CAPTURE = WORK / "se_signal_capture.wav"
 ANALYSIS = WORK / "se_signal_analysis.json"
 GAME_STDOUT = WORK / "game_stdout.log"
 GAME_STDERR = WORK / "game_stderr.log"
-FFMPEG = Path(r"F:/Softwares/oopz/ffmpeg.exe")
-DEVICE = "Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)"
+FFMPEG = test_paths.path("ffmpeg")
+DEVICE = test_paths.setting("audio_device")
 CAPTURE_SECONDS = 12.0
 SE_WINDOW = 0.18
 BAND_FLOOR = 0.001

@@ -1,10 +1,13 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 # Exercise the real close notification followed by SceneTree shutdown/ExitTree.
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	TestPaths.required("game_project")
 	var game: Node = load("res://Scenes/Boot.tscn").instantiate()
 	root.add_child(game)
 	for frame in range(90):
@@ -21,7 +24,7 @@ func _run() -> void:
 			return
 		for frame in range(90):
 			await process_frame
-	var tone := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.wav")
+	var tone := TestPaths.fixture("audio/tone.wav")
 	var ok: bool = driver.RunRuby("Audio.bgm_play(" + JSON.stringify(tone) + "); Audio.se_play(" + JSON.stringify(tone) + "); raise 'shutdown fixture error'") == false
 	if not ok:
 		push_error("Shutdown probe did not observe its deliberate Ruby exception")

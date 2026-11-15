@@ -1,11 +1,11 @@
 output=Dir.pwd
-Dir.chdir('E:/Projects/RMProject')
+Dir.chdir(TestPaths.game)
 module Cache
   class << self
     alias compatibility_load_bitmap load_bitmap
     def load_bitmap(folder,filename,hue=0)
       unless filename.empty? || File.exist?(folder+filename+'.png')
-        folder='F:/Softwares/RPG Maker VX Ace/RTP/'+folder
+        folder=TestPaths.rtp(folder)
       end
       compatibility_load_bitmap(folder,filename,hue)
     end
@@ -15,7 +15,7 @@ module Audio
   class << self
     alias compatibility_se_play se_play
     def se_play(filename,volume=100,pitch=100)
-      filename='F:/Softwares/RPG Maker VX Ace/RTP/'+filename unless File.exist?(filename+'.ogg') || File.exist?(filename+'.wav')
+      filename=TestPaths.rtp(filename) unless File.exist?(filename+'.ogg') || File.exist?(filename+'.wav')
       compatibility_se_play(filename,volume,pitch)
     end
   end

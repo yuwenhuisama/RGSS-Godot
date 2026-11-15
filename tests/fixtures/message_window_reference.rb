@@ -166,7 +166,7 @@ unless $d05_host
       class << self
         alias d05_original_load_bitmap load_bitmap
         def load_bitmap(folder, filename, hue = 0)
-          folder = 'F:/Softwares/RPG Maker VX Ace/RTP/' + folder
+          folder = TestPaths.rtp(folder)
           d05_original_load_bitmap(folder, filename, hue)
         end
       end

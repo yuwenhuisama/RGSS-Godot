@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-base="$HOME/RGSS-Godot-Verification"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
 release_name=${1:-mac-release}
 app="$base/$release_name/install/RGSS-Godot.app"
 mkdir -p "$app/Contents/MacOS/RGSS" "$base/$release_name/empty-cwd" "$base/$release_name/profile"

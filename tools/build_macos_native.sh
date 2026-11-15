@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$HOME/RGSS-Godot-Verification/native"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/test_paths.sh"
+base=$(test_path mac_workspace)
+cd "$base/native"
 printf '%s  %s\n' 354d38673ef8775a1f0bda4e2525cfd11321b0279e4d5a04565669cfd6a02783 tools/defined-compiler/source/mruby-current-source.zip | shasum -a 256 -c -
 mkdir source output
 unzip -q tools/defined-compiler/source/mruby-current-source.zip -d source

@@ -1,11 +1,11 @@
 # Original-runtime oracle: physical Windows input API, stock Input.update.
 $d05_host = true
-eval(File.read('E:/Projects/RGSS-Godot/tests/fixtures/message_window_reference.rb'))
+eval(File.read(TestPaths.fixture('message_window_reference.rb')))
 module Cache
   class << self
     alias d05_input_load_bitmap load_bitmap
     def load_bitmap(folder, filename, hue = 0)
-      d05_input_load_bitmap('F:/Softwares/RPG Maker VX Ace/RTP/' + folder, filename, hue)
+      d05_input_load_bitmap(TestPaths.rtp(folder), filename, hue)
     end
   end
 end

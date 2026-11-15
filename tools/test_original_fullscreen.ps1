@@ -1,8 +1,8 @@
 param(
-    [string]$GodotPath = $(if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'E:\Godot\Godot_v4.6.1-stable_mono_win64.exe' }),
-    [string]$ProjectRoot = 'E:\Projects\RGSS-Godot',
-    [string]$EvidenceDir = 'E:\Projects\RGSS-Godot\.omo\evidence\c12-host-fullscreen',
-    [string]$TempDir = 'E:\Projects\RGSS-Godot\.omo\compatibility-run-tmp\c12-host-fullscreen',
+    [string]$GodotPath,
+    [string]$ProjectRoot,
+    [string]$EvidenceDir,
+    [string]$TempDir,
     [switch]$SkipLegacyRed,
     [switch]$FocusOnly,
     [switch]$F1Entry,
@@ -11,6 +11,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
+if (!$GodotPath) { $GodotPath = Get-TestPath 'godot' }
+if (!$ProjectRoot) { $ProjectRoot = $TestRepoRoot }
+if (!$EvidenceDir) { $EvidenceDir = Get-TestRepoPath '.omo/evidence/c12-host-fullscreen' }
+if (!$TempDir) { $TempDir = Get-TestRepoPath '.omo/compatibility-run-tmp/c12-host-fullscreen' }
 & (Join-Path $PSScriptRoot 'check_input_desktop.ps1')
 Add-Type -AssemblyName System.Drawing
 

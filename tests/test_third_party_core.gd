@@ -1,20 +1,23 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
+	TestPaths.required("game_project")
 	var game: Node = load("res://Scenes/Boot.tscn").instantiate()
 	root.add_child(game)
 	for frame in range(180):
 		await process_frame
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/third-party-core")
+	var output := TestPaths.output("third-party-core")
 	DirAccess.make_dir_recursive_absolute(output)
-	var code := "$third_party_core_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/third_party/Ace_Core_Engine.rb") + "\n" + FileAccess.get_file_as_string("res://tests/fixtures/third_party_core_reference.rb")
+	var code := "$third_party_core_host=true; $rgss_compat_output=" + JSON.stringify(output) + "\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("third_party/Ace_Core_Engine.rb")) + "\n" + FileAccess.get_file_as_string(TestPaths.fixture("third_party_core_reference.rb"))
 	var ok: bool = driver.RunRuby(code)
 	var actual := FileAccess.get_file_as_string(output.path_join("third_party_core_reference.tsv")).replace("\r\n","\n").strip_edges()
-	var expected := FileAccess.get_file_as_string("res://tests/fixtures/third_party_core_original.tsv").replace("\r\n","\n").strip_edges()
+	var expected := FileAccess.get_file_as_string(TestPaths.fixture("third_party_core_original.tsv")).replace("\r\n","\n").strip_edges()
 	print(actual)
 	ok = not expected.is_empty() and actual == expected and ok
 	if "--ui" in OS.get_cmdline_user_args() or "--ruby-exit" in OS.get_cmdline_user_args() or "--immediate-free" in OS.get_cmdline_user_args():

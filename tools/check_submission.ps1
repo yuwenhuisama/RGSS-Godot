@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'test_paths.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $scripts = Get-ChildItem $PSScriptRoot -Filter '*.ps1' -Recurse |
     Where-Object FullName -NotMatch '[\\/](bin|obj)[\\/]'
@@ -9,7 +10,7 @@ foreach ($script in $scripts) {
     if ($errors.Count -gt 0) { throw "$($script.FullName): $($errors | Out-String)" }
 }
 Write-Output "POWERSHELL_SYNTAX_PASS:$($scripts.Count)"
-$bash = 'C:/Program Files/Git/bin/bash.exe'
+$bash = Get-TestPath 'git_bash'
 $shells = Get-ChildItem $PSScriptRoot -Filter '*.sh' -Recurse
 foreach ($script in $shells) {
     & $bash -n $script.FullName.Replace('\', '/')

@@ -1,4 +1,4 @@
-tone = 'E:/Projects/RGSS-Godot/tests/fixtures/audio/tone.wav'
+tone = TestPaths.fixture('audio/tone.wav')
 events = File.open('se_signal_events.tsv', 'w')
 
 def stamp(events, name, extra = nil)

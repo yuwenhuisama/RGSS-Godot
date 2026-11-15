@@ -39,6 +39,10 @@ older failures remain in the topic reports as historical evidence.
 
 ## Tests
 
+Machine-specific test inputs belong in the ignored `.test-paths.local.json`.
+Copy `.test-paths.example.json` and read
+[test path configuration](docs/compatibility/test-path-configuration.md).
+
 Run the unified contract suite (each standalone runner executes in its own VM):
 
 ```sh

@@ -1,24 +1,27 @@
 extends SceneTree
 
+const TestPaths = preload("res://tools/test_paths.gd")
+
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	Engine.max_fps = 60
+	TestPaths.required("rtp")
 	var driver = load("res://Scripts/StressDisposeTestDriver.cs").new()
 	var host := Node.new()
 	root.add_child(host)
 	driver.Initialize(host)
 	var audio_driver = load("res://Scripts/AudioFormatTestDriver.cs").new()
 	audio_driver.Initialize(host)
-	var output := ProjectSettings.globalize_path("res://.omo/evidence/rmva-compatibility/godot/audio-me")
+	var output := TestPaths.output("audio-me")
 	DirAccess.make_dir_recursive_absolute(output)
 	var path := output.path_join("audio_me_reference.tsv")
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
-	var bgm: String = audio_driver.GetRtpPath().path_join("Audio/BGM/Theme1.ogg")
-	var me := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.ogg")
-	var code := "require 'graphics'; require 'audio'; $audio_me_host=true; $audio_me_bgm=" + JSON.stringify(bgm) + "; $audio_me_sound=" + JSON.stringify(me) + "; $rgss_compat_output=" + JSON.stringify(output) + "; $audio_me_probe=Fiber.new do\n" + FileAccess.get_file_as_string("res://tests/fixtures/audio_me_reference.rb") + "\nend"
+	var bgm: String = TestPaths.required("rtp").path_join("Audio/BGM/Theme1.ogg")
+	var me := TestPaths.fixture("audio/tone.ogg")
+	var code := "require 'graphics'; require 'audio'; $audio_me_host=true; $audio_me_bgm=" + JSON.stringify(bgm) + "; $audio_me_sound=" + JSON.stringify(me) + "; $rgss_compat_output=" + JSON.stringify(output) + "; $audio_me_probe=Fiber.new do\n" + TestPaths.ruby_setup() + FileAccess.get_file_as_string(TestPaths.fixture("audio_me_reference.rb")) + "\nend"
 	var ok: bool = driver.RunRuby(code)
 	for frame in range(890):
 		ok = driver.RunRuby("$audio_me_probe.resume if $audio_me_probe.alive?") and ok
@@ -62,7 +65,7 @@ func _run() -> void:
 	var capture := AudioEffectCapture.new()
 	capture.buffer_length = 1.0
 	AudioServer.add_bus_effect(0,capture)
-	var tone := ProjectSettings.globalize_path("res://tests/fixtures/audio/tone.wav")
+	var tone := TestPaths.fixture("audio/tone.wav")
 	ok = driver.RunRuby("Audio.bgm_play(" + JSON.stringify(tone) + ",20,100)") and ok
 	for frame in range(12):
 		await process_frame
