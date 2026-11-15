@@ -6,7 +6,10 @@ mruby4compiler and shared native binding. SHA256:
 
 Pinned upstream base and compatibility changes are described in the parent
 README. Upstream license and generated parser sources are included. Root build
-outputs, Git metadata and caches are excluded; nested lib/mruby/build sources
+outputs, Git metadata and caches are excluded except for the preserved root
+`mruby/vc140.pdb` symbol file from the original source tree. That file is not
+consumed by rebuilds; it is retained so the independently verified archive
+hash and raw provenance remain unchanged. Nested lib/mruby/build sources
 are retained. The archive is byte-identical to the independently rebuilt copy
 in .omo/evidence/owned-compiler-source-archive-complete.
 

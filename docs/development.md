@@ -1,6 +1,8 @@
 # 开发进展与工程验证记录
 
-本文档汇总当前工作区经实际运行命令验证的进展、测试表现与遗留问题。相关交接材料请参考 [docs/cross-machine-handoff.md](cross-machine-handoff.md)，演进规划请参考 [.sisyphus/plans/editor-evolution-roadmap.md](../.sisyphus/plans/editor-evolution-roadmap.md)。
+当前运行时变更请先阅读 [兼容性现状](compatibility/current-status.md) 与 [代码变更摘要](compatibility/change-summary.md)。2026-11-15 提交整理检查中，C# 构建和 22 项基础合同均以退出码 0 通过；七个既有编译警告保留。57/57 是逐项报告的实测范围，不代表所有第三方游戏、Intel Mac、公证发布或无限期无泄漏。
+
+以下章节保留较早工作区与素材实验记录，其基线、警告数量、缺陷和未提交状态都是当时的历史快照，不覆盖当前报告。相关交接材料请参考 [docs/cross-machine-handoff.md](cross-machine-handoff.md)，演进规划请参考 [.sisyphus/plans/editor-evolution-roadmap.md](../.sisyphus/plans/editor-evolution-roadmap.md)。
 
 ## 1. 代码基线与运行环境
 
