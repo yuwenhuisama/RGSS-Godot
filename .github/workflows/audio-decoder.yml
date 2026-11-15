@@ -23,6 +23,9 @@ jobs:
             platform: windows
             shell: 'msys2 {0}'
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v5
       - name: Install Windows build tools
@@ -37,7 +40,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install gnupg
       - name: Verify source and build minimal decoder
-        shell: ${{ matrix.shell }}
         run: |
           set -euo pipefail
           mkdir -p source output
@@ -51,7 +53,6 @@ jobs:
           bash tools/build_audio_decoder.sh source/ffmpeg-8.1.3.tar.xz '${{ matrix.platform }}' output
           cp source/signature.txt source/ffmpeg-8.1.3.tar.xz.asc output/
       - name: Decode production WMA fixture
-        shell: ${{ matrix.shell }}
         run: |
           set -euo pipefail
           binary=output/ffmpeg
