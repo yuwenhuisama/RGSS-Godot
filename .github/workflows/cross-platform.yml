@@ -68,6 +68,8 @@ jobs:
             marker=${entry#*:}
             "$GODOT_BIN" --headless --path . -s "tests/$runner.gd" 2>&1 | tee "evidence/$runner.log"
             grep -Fxq "$marker" "evidence/$runner.log"
+            ! grep -q 'ERROR: FATAL:' "evidence/$runner.log"
+            ! grep -q 'ERROR: Leaked unsafe reference' "evidence/$runner.log"
           done
       - name: Export actual Release package
         shell: bash

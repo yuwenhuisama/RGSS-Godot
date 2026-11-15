@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $output = Join-Path $root '.omo/evidence/submission-regexp-boundary'
+New-Item -ItemType Directory -Force $output | Out-Null
 $env:MSYS_NO_PATHCONV = '1'
 & 'C:/Program Files/Docker/Docker/resources/bin/docker.exe' run --rm --name rgss-submission-regexp-test `
     --mount "type=bind,source=$root,target=/repo,readonly" `
