@@ -12,9 +12,19 @@ namespace RGSSUnity.RubyClasses
         [RbClassMethod("new_without_rect")]
         public static RbValue NewWithoutRect(RbState state, RbValue self)
         {
-            int vw = GlobalConfig.Instance.LegacyMode ? GlobalConfig.Instance.LegacyModeWidth : 544;
-            int vh = GlobalConfig.Instance.LegacyMode ? GlobalConfig.Instance.LegacyModeHeight : 416;
+            var size = Graphics.GetRenderSize();
+            int vw = (int)size.X;
+            int vh = (int)size.Y;
             return CreateViewport(state, 0, 0, vw, vh);
+        }
+
+        [RbClassMethod("new_default")]
+        public static RbValue NewDefault(RbState state, RbValue self)
+        {
+            var size = Graphics.GetRenderSize();
+            int width = (int)size.X;
+            int height = (int)size.Y;
+            return CreateViewport(state, 0, 0, width, height, true);
         }
 
         [RbClassMethod("new_xyrw")]
@@ -145,16 +155,16 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetColor(RbState state, RbValue self)
         {
             // Return the stored Color wrapper so RGSS3 `viewport.color.set(...)`
-            // (screen flash) mutates the live ViewportData.FlashColor.
+            // mutates the permanent viewport color independently of flash.
             var stored = self["@color"];
             if (!stored.IsNil)
                 return stored;
 
             var d = self.GetRDataObject<ViewportData>();
             var colorObj = Color.CreateColor(state,
-                (d.FlashColor?.R ?? 0.0f) * 255.0f, (d.FlashColor?.G ?? 0.0f) * 255.0f,
-                (d.FlashColor?.B ?? 0.0f) * 255.0f, (d.FlashColor?.A ?? 0.0f) * 255.0f);
-            d.FlashColor = colorObj.GetRDataObject<ColorData>();
+                (d.Color?.R ?? 0.0f) * 255.0f, (d.Color?.G ?? 0.0f) * 255.0f,
+                (d.Color?.B ?? 0.0f) * 255.0f, (d.Color?.A ?? 0.0f) * 255.0f);
+            d.Color = colorObj.GetRDataObject<ColorData>();
             self["@color"] = colorObj;
             return colorObj;
         }
@@ -163,7 +173,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue SetColor(RbState state, RbValue self, RbValue color)
         {
             var d = self.GetRDataObject<ViewportData>();
-            d.FlashColor = color.IsNil ? null : color.GetRDataObject<ColorData>();
+            d.Color = color.IsNil ? null : color.GetRDataObject<ColorData>();
             self["@color"] = color;
             return state.RbNil;
         }
@@ -172,15 +182,9 @@ namespace RGSSUnity.RubyClasses
         public static RbValue Flash(RbState state, RbValue self, RbValue color, RbValue duration)
         {
             var d = self.GetRDataObject<ViewportData>();
-            d.FlashDuration = (int)duration.ToIntUnchecked();
+            d.FlashDuration = System.Math.Max(1, (int)duration.ToIntUnchecked());
             d.FlashRemain = d.FlashDuration;
-            if (!color.IsNil)
-            {
-                // Keep the stored @color wrapper and FlashColor as one instance so a later
-                // `viewport.color.set(...)` still targets the live flash color.
-                d.FlashColor = color.GetRDataObject<ColorData>();
-                self["@color"] = color;
-            }
+            d.FlashColor = color.IsNil ? null : color.GetRDataObject<ColorData>();
             return state.RbNil;
         }
 
@@ -199,21 +203,22 @@ namespace RGSSUnity.RubyClasses
         }
 
         // ── helper ───────────────────────────────────────────────────────────
-        private static RbValue CreateViewport(RbState state, int x, int y, int w, int h)
+        private static RbValue CreateViewport(RbState state, int x, int y, int w, int h, bool isDefault = false)
         {
             var toneObj = Tone.CreateTone(state, 0.0f, 0.0f, 0.0f, 0.0f);
             var colorObj = Color.CreateColor(state, 0.0f, 0.0f, 0.0f, 0.0f);
             // The viewport's rect lives in a persistent Rect wrapper so the Ruby side can
             // mutate it in place (`viewport.rect.y = N`); ViewportData.X/Y/Width/Height
             // forward to this same RectData.
-            var rectObj = Rect.CreateRect(state, x, y, System.Math.Max(1, w), System.Math.Max(1, h));
+            var rectObj = Rect.CreateRect(state, x, y, w, h);
             var data = new ViewportData(state)
             {
                 Rect = rectObj.GetRDataObject<RectData>(),
                 Z = 0,
                 Visible = true,
+                IsDefault = isDefault,
                 Tone = toneObj.GetRDataObject<ToneData>(),
-                FlashColor = colorObj.GetRDataObject<ColorData>(),
+                Color = colorObj.GetRDataObject<ColorData>(),
             };
             GameRenderManager.Instance.RegisterViewport(data);
 

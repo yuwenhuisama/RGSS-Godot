@@ -24,7 +24,8 @@ public partial class GameManager : Node
             // Godot's InputMap. The recorder polls held action state itself each frame
             // (driven by Ruby's Input.update), so no separate poller node is needed.
             InputStateRecorder.Instance.Init();
-            RegisterInputActions();
+            GameInputManager.RegisterActions();
+            AddChild(new GameSettings());
 
             RubyScriptManager.Instance.Initialize();
             GD.Print("SCRIPTS_LOADED:OK");
@@ -48,26 +49,31 @@ public partial class GameManager : Node
         RGSSLogger.FlushPendingMessages();
     }
 
+    public override void _Input(InputEvent @event)
+    {
+        if (@event is not InputEventKey { Pressed: true, Echo: false } key)
+            return;
+        if (key.Keycode == Key.F12)
+        {
+            UnityModule.RequestReset();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     // Registers the 20 RGSS actions in Godot's InputMap, binding each to the same
     // physical keyboard key declared in Assets/RGSSInput.inputactions. Idempotent:
     // safe to call once at startup. The action/key table is the single source of
     // truth on GameInputManager so registration and polling can never drift.
     private static void RegisterInputActions()
     {
-        foreach (var (_, action, keycode) in GameInputManager.ActionTable)
-        {
-            if (!InputMap.HasAction(action))
-                InputMap.AddAction(action);
-
-            InputMap.ActionEraseEvents(action);
-            InputMap.ActionAddEvent(action, new InputEventKey { Keycode = keycode });
-        }
+        GameInputManager.RegisterActions();
     }
 
     public override void _ExitTree()
     {
         GameRenderManager.Instance.Dispose();
         GameAudioManager.Instance.Dispose();
+        GameMidiPlayer.Close();
         RubyScriptManager.Instance.Destroy();
     }
 
@@ -76,9 +82,15 @@ public partial class GameManager : Node
         if (what != NotificationWMCloseRequest)
             return;
 
+        QuitGame(GetTree());
+    }
+
+    public static void QuitGame(SceneTree tree)
+    {
         GameRenderManager.Instance.Dispose();
         GameAudioManager.Instance.Dispose();
+        GameMidiPlayer.Close();
         RubyScriptManager.Instance.Destroy();
-        GetTree().Quit();
+        tree.Quit();
     }
 }

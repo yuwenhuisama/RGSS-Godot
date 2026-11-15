@@ -16,11 +16,13 @@ class Color
     elsif args.size == 3
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b = args
-      @__handler__ = Unity::Color.new_rgba(r, g, b, 255)
+      # RGSS300 constructor clamps only the upper bound: negative components are
+      # kept as-is (Color.new(-1, 300, 12, 400) -> -1, 255, 12, 255).
+      @__handler__ = Unity::Color.new_rgba([r, 255].min, [g, 255].min, [b, 255].min, 255)
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b, a = args
-      @__handler__ = Unity::Color.new_rgba(r, g, b, a)
+      @__handler__ = Unity::Color.new_rgba([r, 255].min, [g, 255].min, [b, 255].min, [a, 255].min)
     else
       raise ArgumentError.new("Invalid number of arguments")
     end
@@ -41,7 +43,7 @@ class Color
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 
       r, g, b, a = args
-      @__handler__.set_rgba(r.clamp(0, 255), g.clamp(0, 255), b.clamp(0, 255), a.clamp(0, 255))
+      @__handler__.set_rgba([r, 255].min, [g, 255].min, [b, 255].min, a.clamp(0, 255))
     else
       raise ArgumentError.new("Invalid number of arguments")
     end
@@ -66,7 +68,7 @@ class Color
   [:red, :blue, :green, :alpha].each do |prop|
     define_method("#{prop}=") do |value|
       check_type(value, [Integer, Float])
-      v = value.clamp(0, 255)
+      v = prop == :alpha ? value.clamp(0, 255) : [value, 255].min
       @__handler__.send("#{prop}=", v)
     end
     define_method(prop) do

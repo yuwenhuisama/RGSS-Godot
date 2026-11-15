@@ -6,16 +6,19 @@ namespace RGSSUnity.RubyClasses;
 
 public class BitmapData : RubyData
 {
+    public static int LiveResourceCount { get; private set; }
     public Image Image = null!;
     public ImageTexture Texture = null!;
     public int Width;
     public int Height;
     public bool Dirty;
+    public long TextureRevision;
     public FontData? FontData;
     public bool Disposed;
 
     public BitmapData(RbState state) : base(state)
     {
+        LiveResourceCount++;
     }
 
     public void MarkDirty()
@@ -33,14 +36,19 @@ public class BitmapData : RubyData
             return;
 
         this.Texture.Update(this.Image);
+        this.TextureRevision++;
         this.Dirty = false;
     }
 
     public void ReleaseResources()
     {
+        if (!this.Disposed)
+            LiveResourceCount--;
         this.Dirty = false;
         this.Disposed = true;
         GameRenderManager.DirtyBitmapDataSet.Remove(this);
+        this.Texture?.Dispose();
+        this.Image?.Dispose();
         this.Image = null!;
         this.Texture = null!;
         this.FontData = null;

@@ -7,17 +7,19 @@ namespace RGSSUnity.RubyClasses
     public static class Audio
     {
         private static GameAudioManager Instance_ = null!;
+        private static bool bgmIsMidi;
 
         [RbInitEntryPoint]
         public static void Init(RbClass cls)
         {
             Instance_ = GameAudioManager.Instance;
+            bgmIsMidi = false;
         }
 
         [RbModuleMethod("setup_midi")]
         public static RbValue SetupMidi(RbState state, RbValue self)
         {
-            state.RaiseNotImplementError();
+            GameMidiPlayer.Initialize();
             return state.RbNil;
         }
 
@@ -29,6 +31,15 @@ namespace RGSSUnity.RubyClasses
             var pit   = (float)(pitch.ToIntUnchecked()  / 100.0);
             var posV  = pos.IsInt ? (float)pos.ToIntUnchecked() : (float)pos.ToFloatUnchecked();
             var file  = filename.ToStringUnchecked() ?? string.Empty;
+            bgmIsMidi = GameMidiPlayer.IsMidi(file);
+            if (bgmIsMidi)
+            {
+                Instance_.Stop(GameAudioManager.PlayType.Bgm);
+                GameMidiPlayer.Play(file, vol, pit, 0f);
+                GameMidiPlayer.SetPaused(Instance_.MePlaying);
+                return state.RbNil;
+            }
+            GameMidiPlayer.Stop();
             state.GcRegister(onLoadedProc);
             Instance_.Play(GameAudioManager.PlayType.Bgm, file, vol, pit, posV, succ =>
             {
@@ -42,16 +53,22 @@ namespace RGSSUnity.RubyClasses
         public static RbValue BgmStop(RbState state, RbValue self)
         {
             Instance_.Stop(GameAudioManager.PlayType.Bgm);
+            GameMidiPlayer.Stop();
             return state.RbNil;
         }
 
         [RbModuleMethod("bgm_pos")]
         public static RbValue BgmPos(RbState state, RbValue self)
-            => Instance_.Pos(GameAudioManager.PlayType.Bgm).ToValue(state);
+            => (bgmIsMidi ? 0f : Instance_.Pos(GameAudioManager.PlayType.Bgm)).ToValue(state);
 
         [RbModuleMethod("bgm_fade")]
         public static RbValue BgmFade(RbState state, RbValue self, RbValue time)
         {
+            if (GameMidiPlayer.Playing)
+            {
+                GameMidiPlayer.Fade(time.ToIntUnchecked());
+                return state.RbNil;
+            }
             Instance_.Fade(GameAudioManager.PlayType.Bgm, time.ToIntUnchecked());
             return state.RbNil;
         }

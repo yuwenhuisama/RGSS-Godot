@@ -40,7 +40,6 @@ public sealed class GameRenderManager : IDisposable
     // Masked screen transition (Graphics.freeze + Graphics.transition with a mask image).
     private ShaderMaterial? transitionMaterial;
     private Texture2D? frozenTexture;
-    private Texture2D? newTexture;
     private Texture2D? maskTexture;
     private bool transitionActive;
     private int transitionTotalFrames;
@@ -76,6 +75,7 @@ public sealed class GameRenderManager : IDisposable
         this.renderRoot = new Node2D
         {
             Name = "RmvaRenderRoot",
+            YSortEnabled = false,
         };
         this.compositeLayer.AddChild(this.renderRoot);
 
@@ -100,7 +100,7 @@ public sealed class GameRenderManager : IDisposable
             Size = renderSize,
             Color = Colors.Transparent,
         };
-        var postprocessShader = GD.Load<Shader>("res://Shaders/GraphicsPostprocessShader.gdshader");
+        using var postprocessShader = GD.Load<Shader>("res://Shaders/GraphicsPostprocessShader.gdshader");
         if (postprocessShader is not null)
         {
             this.postprocessMaterial = new ShaderMaterial { Shader = postprocessShader };
@@ -111,11 +111,11 @@ public sealed class GameRenderManager : IDisposable
         this.postprocessQuad.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         this.postprocessLayer.AddChild(this.postprocessQuad);
 
-        var transitionShader = GD.Load<Shader>("res://Shaders/TransitionPostprocessShader.gdshader");
+        using var transitionShader = GD.Load<Shader>("res://Shaders/TransitionPostprocessShader.gdshader");
         if (transitionShader is not null)
             this.transitionMaterial = new ShaderMaterial { Shader = transitionShader };
 
-        var spriteShader = GD.Load<Shader>("res://Shaders/SpriteShader.gdshader");
+        using var spriteShader = GD.Load<Shader>("res://Shaders/SpriteShader.gdshader");
         if (spriteShader is not null)
             this.spriteMaterial = new ShaderMaterial { Shader = spriteShader };
 
@@ -138,6 +138,11 @@ public sealed class GameRenderManager : IDisposable
 
         this.TickBrightnessFade();
         this.TickTransition();
+        this.SyncRenderState();
+    }
+
+    public void SyncRenderState()
+    {
         ResetDirtyDataSet();
 
         if (this.pendingViewports.Count > 0 && this.initialized && this.renderRoot is not null)
@@ -211,24 +216,37 @@ public sealed class GameRenderManager : IDisposable
             if (!this.viewports.TryGetValue(viewportData, out var entry))
                 continue;
 
-            entry.Wrapper.ZIndex = viewportData.Z;
-            // Apply the RGSS Viewport geometry: rect.(x,y) positions the clipped region on
-            // screen, rect.(w,h) is the hard clip (the SubViewport renders only that area),
-            // and ox/oy scrolls the contents inside it. For the default full-screen viewport
-            // (0,0,544,416) with ox=oy=0 this reduces to the previous behaviour exactly.
+            if (viewportData.IsDefault)
+            {
+                foreach (var child in this.renderRoot.GetChildren())
+                {
+                    if (child is SpriteDataNode defaultSprite) RenderSprite(defaultSprite.Data);
+                    else if (child is PlaneDataNode defaultPlane) RenderPlane(defaultPlane.Data);
+                    else if (child is WindowDataNode defaultWindow) RenderWindow(defaultWindow.Data);
+                    else if (child is TilemapDataNode defaultTilemap) RenderTilemap(defaultTilemap.Data);
+                }
+                entry.Wrapper.Visible = false;
+                continue;
+            }
+
+            // Viewport is a clipped segment of the screen draw list. Its objects blend
+            // against the preceding screen before the full rectangle's effects run.
             var rectWidth = Math.Max(1, viewportData.Width);
             var rectHeight = Math.Max(1, viewportData.Height);
-            var desiredSize = new Vector2I(rectWidth, rectHeight);
-            if (entry.SubViewport.Size != desiredSize)
-            {
-                entry.SubViewport.Size = desiredSize;
-                // Re-fetch the texture: a SubViewport hands out a new ViewportTexture when
-                // its size changes.
-                entry.Wrapper.Texture = entry.SubViewport.GetTexture();
-            }
-            entry.Wrapper.Position = new Vector2(viewportData.X, viewportData.Y);
+            entry.Clip.Position = new Vector2(viewportData.X, viewportData.Y);
+            entry.Clip.Size = new Vector2(rectWidth, rectHeight);
+            entry.Wrapper.Size = entry.Clip.Size;
             entry.SubViewportRoot.Position = new Vector2(-viewportData.Ox, -viewportData.Oy);
-            entry.Wrapper.Visible = viewportData.Visible && rectWidth > 0 && rectHeight > 0;
+            entry.Clip.Visible = viewportData.Visible && viewportData.Width > 0 && viewportData.Height > 0
+                && !(viewportData.FlashRemain > 0 && viewportData.FlashColor is null);
+            entry.Wrapper.Visible = true;
+            if (entry.Wrapper.Material is ShaderMaterial viewportMaterial)
+            {
+                viewportMaterial.SetShaderParameter("tone", new Vector4(viewportData.Tone?.Red ?? 0, viewportData.Tone?.Green ?? 0, viewportData.Tone?.Blue ?? 0, viewportData.Tone?.Gray ?? 0));
+                viewportMaterial.SetShaderParameter("mix_color", ToGodotColor(viewportData.Color));
+                viewportMaterial.SetShaderParameter("flash_color", ToGodotColor(viewportData.FlashColor));
+                viewportMaterial.SetShaderParameter("flash_progress", viewportData.FlashRemain > 0 ? (float)viewportData.FlashRemain / viewportData.FlashDuration : 0.0f);
+            }
 
             foreach (var child in entry.SubViewportRoot.GetChildren())
             {
@@ -242,6 +260,56 @@ public sealed class GameRenderManager : IDisposable
                     RenderTilemap(tilemapNode.Data);
             }
         }
+        this.OrderScreenDrawables();
+    }
+
+    private void OrderScreenDrawables()
+    {
+        var segments = new List<(int Z, float Y, ulong Sequence, List<CanvasItem> Items)>();
+        foreach (var pair in this.viewports)
+        {
+            var items = new List<CanvasItem>();
+            foreach (var child in pair.Value.SubViewportRoot.GetChildren())
+            {
+                if (child is SpriteDataNode sprite) items.Add(sprite);
+                else if (child is PlaneDataNode or WindowDataNode or TilemapDataNode)
+                {
+                    foreach (var drawable in child.GetChildren())
+                        if (drawable is CanvasItem item) items.Add(item);
+                    ((CanvasItem)child).ZIndex = 0;
+                }
+            }
+            items.Sort(static (a, b) =>
+            {
+                var z = a.ZIndex.CompareTo(b.ZIndex);
+                if (z != 0) return z;
+                var y = (a is SpriteDataNode sa ? sa.Data.Y : 0).CompareTo(b is SpriteDataNode sb ? sb.Data.Y : 0);
+                var sequenceA = a is SpriteDataNode spriteA ? spriteA.Data.CreationSequence : a.GetParent() is TilemapDataNode tileA ? tileA.Data.CreationSequence : a.GetInstanceId();
+                var sequenceB = b is SpriteDataNode spriteB ? spriteB.Data.CreationSequence : b.GetParent() is TilemapDataNode tileB ? tileB.Data.CreationSequence : b.GetInstanceId();
+                return y != 0 ? y : sequenceA.CompareTo(sequenceB);
+            });
+            if (pair.Key.IsDefault)
+            {
+                foreach (var item in items)
+                    segments.Add((item.ZIndex, item is SpriteDataNode sprite ? sprite.Data.Y : 0, item is SpriteDataNode orderedSprite ? orderedSprite.Data.CreationSequence : item.GetParent() is TilemapDataNode tile ? tile.Data.CreationSequence : item.GetInstanceId(), new List<CanvasItem> { item }));
+            }
+            else
+            {
+                items.Add(pair.Value.Wrapper);
+                segments.Add((pair.Key.Z, 0, pair.Key.CreationSequence, items));
+            }
+        }
+        segments.Sort(static (a, b) =>
+        {
+            var z = a.Z.CompareTo(b.Z);
+            if (z != 0) return z;
+            var y = a.Y.CompareTo(b.Y);
+            return y != 0 ? y : a.Sequence.CompareTo(b.Sequence);
+        });
+        var slot = -4096;
+        foreach (var segment in segments)
+            foreach (var item in segment.Items)
+                item.ZIndex = slot++;
     }
 
     public void RegisterViewport(ViewportData data)
@@ -259,34 +327,37 @@ public sealed class GameRenderManager : IDisposable
 
         var initialWidth = Math.Max(1, data.Width);
         var initialHeight = Math.Max(1, data.Height);
-        var subViewport = new SubViewport
-        {
-            Name = $"RmvaSubViewport_{this.viewports.Count}",
-            Size = new Vector2I(initialWidth, initialHeight),
-            TransparentBg = true,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-        };
-
         var subViewportRoot = new Node2D
         {
-            Name = "RmvaSubViewportRoot",
+            Name = "RmvaViewportContents",
         };
-        subViewport.AddChild(subViewportRoot);
-        this.renderRoot.AddChild(subViewport);
 
-        var wrapper = new Sprite2D
+        var clip = new Control
+        {
+            Name = $"ViewportClip_{this.viewports.Count}",
+            ClipContents = true,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Position = new Vector2(data.X, data.Y),
+            Size = new Vector2(initialWidth, initialHeight),
+        };
+        this.renderRoot.AddChild(clip);
+        clip.AddChild(subViewportRoot);
+
+        using var viewportShader = GD.Load<Shader>("res://Shaders/ViewportShader.gdshader");
+        var wrapper = new ColorRect
         {
             Name = $"ViewportWrapper_{this.viewports.Count}",
-            Texture = subViewport.GetTexture(),
-            Centered = false,
-            FlipV = false,
-            Position = new Vector2(data.X, data.Y),
+            Color = Colors.White,
+            Size = clip.Size,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
             ZAsRelative = false,
             ZIndex = data.Z,
+            Material = new ShaderMaterial { Shader = viewportShader },
         };
-        this.renderRoot.AddChild(wrapper);
+        clip.AddChild(wrapper);
+        wrapper.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
 
-        this.viewports.Add(data, new ViewportRenderEntry(subViewport, subViewportRoot, wrapper));
+        this.viewports.Add(data, new ViewportRenderEntry(data.IsDefault ? this.renderRoot : subViewportRoot, wrapper, clip));
     }
 
     public void UnregisterViewport(ViewportData data)
@@ -336,8 +407,10 @@ public sealed class GameRenderManager : IDisposable
                 this.UnregisterTilemap(tilemap);
         }
 
-        entry.Wrapper.QueueFree();
-        entry.SubViewport.QueueFree();
+        var viewportMaterial = entry.Wrapper.Material;
+        entry.Wrapper.Material = null;
+        viewportMaterial?.Dispose();
+        entry.Clip.QueueFree();
     }
 
     public void RegisterTilemap(TilemapData data, ViewportData viewport)
@@ -414,11 +487,18 @@ public sealed class GameRenderManager : IDisposable
             Name = "RgssSprite",
             Data = data,
             Centered = false,
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
             ZAsRelative = false,
             Material = this.spriteMaterial?.Duplicate() as Material,
         };
 
         entry.SubViewportRoot.AddChild(node);
+        node.BackgroundCopy = new BackBufferCopy
+        {
+            CopyMode = BackBufferCopy.CopyModeEnum.Viewport,
+            ShowBehindParent = true,
+        };
+        node.AddChild(node.BackgroundCopy);
         data.Node = node;
         this.sprites.Add(data, node);
     }
@@ -525,20 +605,18 @@ public sealed class GameRenderManager : IDisposable
         node.QueueFree();
     }
 
-    public SubViewport GetSubViewport(ViewportData data)
-    {
-        if (!this.viewports.TryGetValue(data, out var entry))
-            throw new KeyNotFoundException("Viewport is not registered.");
-
-        return entry.SubViewport;
-    }
-
     public void Dispose()
     {
+        foreach (var cached in RegionTextureCache.Values)
+            cached.Texture.Dispose();
+        RegionTextureCache.Clear();
+        DirtyBitmapDataSet.Clear();
         foreach (var entry in this.viewports.Values)
         {
-            entry.Wrapper.QueueFree();
-            entry.SubViewport.QueueFree();
+            var viewportMaterial = entry.Wrapper.Material;
+            entry.Wrapper.Material = null;
+            viewportMaterial?.Dispose();
+            entry.Clip.QueueFree();
         }
 
         this.viewports.Clear();
@@ -564,7 +642,9 @@ public sealed class GameRenderManager : IDisposable
         this.renderRoot = null;
         this.compositeLayer = null;
         this.parent = null;
+        this.spriteMaterial?.Dispose();
         this.spriteMaterial = null;
+        this.postprocessMaterial?.Dispose();
         this.postprocessMaterial = null;
 
         this.transitionActive = false;
@@ -572,7 +652,7 @@ public sealed class GameRenderManager : IDisposable
         this.transitionFinishedThisFrame = false;
         ReleaseTexture(ref this.maskTexture);
         ReleaseTexture(ref this.frozenTexture);
-        ReleaseTexture(ref this.newTexture);
+        this.transitionMaterial?.Dispose();
         this.transitionMaterial = null;
 
         this.initialized = false;
@@ -596,12 +676,22 @@ public sealed class GameRenderManager : IDisposable
         if (data.Bitmap is { Dirty: true })
             data.Bitmap.UpdateTexture();
 
-        node.Visible = data.Visible && data.Bitmap is { Disposed: false };
+        if (node is SpriteDataNode blendNode)
+        {
+            blendNode.SetBlendType(data.BlendType);
+            blendNode.BackgroundCopy.Visible = data.BlendType == 2 || (data.BlendType == 0
+                && (data.Opacity < 255 || data.BushDepth > 0 || data.Bitmap?.Image.DetectAlpha() != Image.AlphaMode.None));
+        }
+
+        node.Visible = data.Visible && data.Bitmap is { Disposed: false } && data.ZoomX > 0 && data.ZoomY > 0
+            && data.SrcRect is { Width: > 0, Height: > 0 }
+            && !(data.FlashRemain > 0 && data.FlashColor is null);
         node.Texture = data.Bitmap?.Texture;
         node.ZIndex = data.Z;
-        node.Position = new Vector2(data.X - data.Ox, data.Y - data.Oy);
+        node.Position = new Vector2(data.X, data.Y);
+        node.Offset = new Vector2(-data.Ox, -data.Oy);
         node.Scale = new Vector2(data.ZoomX, data.ZoomY);
-        node.RotationDegrees = data.Angle;
+        node.RotationDegrees = -data.Angle;
         node.FlipH = data.Mirror;
 
         if (data.Bitmap is not null && data.SrcRect is not null && data.SrcRect.Width > 0 && data.SrcRect.Height > 0)
@@ -612,17 +702,24 @@ public sealed class GameRenderManager : IDisposable
         else
             node.RegionEnabled = false;
 
+        if (node.Visible && (data.Angle != 0 || data.ZoomX != MathF.Truncate(data.ZoomX) || data.ZoomY != MathF.Truncate(data.ZoomY)) && node is SpriteDataNode spriteNode)
+            spriteNode.RenderRotation();
+        if (node.Visible && data.WaveAmp != 0 && node is SpriteDataNode waveNode)
+            waveNode.RenderWave();
+
         var width = data.SrcRect?.Width > 0 ? data.SrcRect.Width : data.Bitmap?.Width ?? 1;
         var height = data.SrcRect?.Height > 0 ? data.SrcRect.Height : data.Bitmap?.Height ?? 1;
-        node.SetInstanceShaderParameter("_PackedA", new Vector4(data.WaveAmp, data.WaveLength, data.WaveSpeed, data.BushOpacity / 255.0f));
+        node.SetInstanceShaderParameter("_PackedA", new Vector4(0, data.WaveLength, data.WavePhase, data.BushOpacity / 255.0f));
         node.SetInstanceShaderParameter("_PackedB", new Vector4(data.Tone?.Red ?? 0.0f, data.Tone?.Green ?? 0.0f, data.Tone?.Blue ?? 0.0f, data.Tone?.Gray ?? 0.0f));
         node.SetInstanceShaderParameter("_PackedC", BuildFlashVector(data));
-        node.SetInstanceShaderParameter("_PackedD", new Vector4(data.Opacity / 255.0f, data.Mirror ? 1.0f : 0.0f, (data.Tone?.Gray ?? 0.0f) > 0.0f ? 1.0f : 0.0f, 0.0f));
+        node.SetInstanceShaderParameter("_PackedD", new Vector4(data.Opacity / 255.0f, 0.0f, (data.Tone?.Gray ?? 0.0f) > 0.0f ? 1.0f : 0.0f, 0.0f));
 
         if (node.Material is ShaderMaterial material)
         {
             material.SetShaderParameter("mix_color", ToGodotColor(data.Color));
-            material.SetShaderParameter("bush_depth", data.BushDepth / 255.0f);
+            var textureHeight = Math.Max(1, node.Texture?.GetHeight() ?? height);
+            var regionBottom = node.RegionEnabled ? node.RegionRect.End.Y : textureHeight;
+            material.SetShaderParameter("bush_depth", regionBottom / textureHeight - data.BushDepth / Math.Max(1.0f, textureHeight * node.Scale.Y));
             material.SetShaderParameter("texture_size", new Vector2(Math.Max(1, width), Math.Max(1, height)));
         }
     }
@@ -642,15 +739,16 @@ public sealed class GameRenderManager : IDisposable
         var viewportSize = GetNodeRenderSize(node);
 
         node.ZIndex = data.Z;
-        node.Visible = data.Visible && hasBitmap;
+        node.Visible = data.Visible && hasBitmap && Math.Floor(bitmap!.Width * data.ZoomX) > 0 && Math.Floor(bitmap.Height * data.ZoomY) > 0;
 
         drawable.Visible = node.Visible;
         drawable.Texture = hasBitmap ? bitmap!.Texture : null;
         drawable.Size = viewportSize;
+        drawable.Position = new Vector2(data.Viewport?.Ox ?? 0, data.Viewport?.Oy ?? 0);
         drawable.ZIndex = data.Z;
-        drawable.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.Opacity));
+        drawable.Modulate = Colors.White;
 
-        if (!hasBitmap)
+        if (!node.Visible)
             return;
 
         if (drawable.Material is not ShaderMaterial material || material.ResourceName != GetPlaneMaterialName(data.BlendType))
@@ -659,13 +757,19 @@ public sealed class GameRenderManager : IDisposable
             drawable.Material = material;
         }
 
-        var zoomX = Math.Abs(data.ZoomX) > 0.0001f ? data.ZoomX : 1.0f;
-        var zoomY = Math.Abs(data.ZoomY) > 0.0001f ? data.ZoomY : 1.0f;
+        var zoomX = data.ZoomX;
+        var zoomY = data.ZoomY;
         material.SetShaderParameter("mix_color", ToGodotColor(data.Color));
         material.SetShaderParameter("tone", new Vector4(data.Tone?.Red ?? 0.0f, data.Tone?.Green ?? 0.0f, data.Tone?.Blue ?? 0.0f, data.Tone?.Gray ?? 0.0f));
         material.SetShaderParameter("tile_scale", new Vector2(viewportSize.X / bitmap!.Width / zoomX, viewportSize.Y / bitmap.Height / zoomY));
-        material.SetShaderParameter("uv_offset", new Vector2(data.Ox / Math.Max(1.0f, viewportSize.X), data.Oy / Math.Max(1.0f, viewportSize.Y)));
+        material.SetShaderParameter("viewport_size", viewportSize);
+        material.SetShaderParameter("bitmap_size", new Vector2(bitmap.Width, bitmap.Height));
+        material.SetShaderParameter("zoom", new Vector2(zoomX, zoomY));
+        material.SetShaderParameter("scroll", new Vector2(data.Ox + (data.Viewport?.Ox ?? 0), data.Oy + (data.Viewport?.Oy ?? 0)));
         material.SetShaderParameter("scroll_speed", Vector2.Zero);
+        material.SetShaderParameter("opacity", ToAlpha(data.Opacity));
+        material.SetShaderParameter("blend_type", data.BlendType);
+        material.SetShaderParameter("uv_offset", new Vector2((data.Ox + (data.Viewport?.Ox ?? 0)) / (bitmap.Width * zoomX), (data.Oy + (data.Viewport?.Oy ?? 0)) / (bitmap.Height * zoomY)));
     }
 
     public static void RenderWindow(WindowData data)
@@ -681,23 +785,23 @@ public sealed class GameRenderManager : IDisposable
             data.Contents.UpdateTexture();
 
         var background = GetOrCreateWindowTextureRect(node, "WindowBackground", "res://Shaders/WindowBackgroundShader.gdshader");
-        var tiledBackground = GetOrCreateWindowTextureRect(node, "WindowTiledBackground", "res://Shaders/TiledBackgroundShader.gdshader");
         var border = GetOrCreateWindowNinePatch(node, "WindowBorder", 16, false);
         var contents = GetOrCreateWindowContents(node);
-        var cursor = GetOrCreateWindowNinePatch(node, "WindowCursor", 2, true);
+        var cursor = GetOrCreateWindowNinePatch(node, "WindowCursor", 4, true);
+        cursor.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
 
         var openness = Math.Clamp(data.Openness / 255.0f, 0.0f, 1.0f);
         var width = Math.Max(0, data.Width);
         var height = Math.Max(0, data.Height);
         var backgroundWidth = Math.Max(0, width - 2);
         var backgroundHeight = Math.Max(0, height - 2) * openness;
-        var borderHeight = height * openness;
+        var borderHeight = (int)(height * openness);
         var windowOpacity = ToAlpha(data.Opacity);
         var hasWindowskin = data.Windowskin is { Disposed: false, Texture: not null };
 
         node.Visible = data.Visible && width > 0 && height > 0 && openness > 0.0f;
         node.ZIndex = data.Z;
-        node.Position = new Vector2(data.X, data.Y + height * (1.0f - openness) / 2.0f);
+        node.Position = new Vector2(data.X, data.Y + (height - borderHeight) / 2);
 
         background.Visible = node.Visible && hasWindowskin;
         background.Texture = GetRegionTexture(data.Windowskin, new Rect2I(0, 0, 64, 64));
@@ -706,31 +810,32 @@ public sealed class GameRenderManager : IDisposable
         background.ZIndex = data.Z;
         background.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, ToAlpha(data.BackOpacity) * windowOpacity);
 
-        tiledBackground.Visible = node.Visible && hasWindowskin;
-        tiledBackground.Texture = GetRegionTexture(data.Windowskin, new Rect2I(0, 64, 64, 64));
-        tiledBackground.Position = background.Position;
-        tiledBackground.Size = background.Size;
-        tiledBackground.ZIndex = data.Z + 1;
-        tiledBackground.Modulate = background.Modulate;
 
         border.Visible = node.Visible && hasWindowskin;
         border.Texture = GetRegionTexture(data.Windowskin, new Rect2I(64, 0, 64, 64));
         border.Position = new Vector2(0.0f, 0.0f);
-        border.Size = new Vector2(width, borderHeight);
+        border.Size = new Vector2(width, height);
+        border.Scale = new Vector2(1.0f, height > 0 ? borderHeight / (float)height : 0.0f);
+        if (border.Material is not ShaderMaterial borderMaterial)
+        {
+            using var borderShader = GD.Load<Shader>("res://Shaders/WindowBorderShader.gdshader");
+            borderMaterial = new ShaderMaterial { Shader = borderShader };
+            border.Material = borderMaterial;
+            border.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
+        }
+        borderMaterial.SetShaderParameter("window_size", new Vector2(width, height));
         border.ZIndex = data.Z + 2;
         border.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
 
         var tone = new Vector4(data.Tone?.Red ?? 0.0f, data.Tone?.Green ?? 0.0f, data.Tone?.Blue ?? 0.0f, data.Tone?.Gray ?? 0.0f);
         if (background.Material is ShaderMaterial backgroundMaterial)
-            backgroundMaterial.SetShaderParameter("tone", tone);
-
-        if (tiledBackground.Material is ShaderMaterial tiledMaterial)
         {
-            tiledMaterial.SetShaderParameter("tone", tone);
-            tiledMaterial.SetShaderParameter("tile_scale", new Vector2(backgroundWidth / 64.0f, Math.Max(0.0f, height - 2) / 64.0f));
-            tiledMaterial.SetShaderParameter("uv_offset", new Vector2(2.0f / 64.0f, 2.0f / 64.0f));
-            tiledMaterial.SetShaderParameter("scroll_speed", Vector2.Zero);
+            backgroundMaterial.SetShaderParameter("tone", tone);
+            using var tiledTextureParameter = Variant.From(GetRegionTexture(data.Windowskin, new Rect2I(0, 64, 64, 64)));
+            backgroundMaterial.SetShaderParameter("tiled_texture", tiledTextureParameter);
+            backgroundMaterial.SetShaderParameter("background_size", background.Size);
         }
+
 
         var contentWidth = Math.Max(0, width - data.Padding * 2);
         var contentHeight = Math.Max(0, height - data.Padding - data.PaddingBottom);
@@ -738,7 +843,7 @@ public sealed class GameRenderManager : IDisposable
         contents.Visible = node.Visible && hasContents && data.Openness == 255;
         contents.Texture = hasContents ? data.Contents!.Texture : null;
         contents.Position = new Vector2(data.Padding - data.Ox, data.Padding - data.Oy);
-        contents.ZIndex = data.Z + 3;
+        contents.ZIndex = data.Z + 5;
         // Contents (text/icons) alpha is driven SOLELY by contents_opacity, never by the
         // window's `opacity`. In RGSS3 (and mkxp/mkxp-z) `opacity` only fades the windowskin
         // background+frame (the `base` quad); the contents quad is a separate object whose
@@ -764,12 +869,19 @@ public sealed class GameRenderManager : IDisposable
         cursor.Texture = GetRegionTexture(data.Windowskin, new Rect2I(64, 64, 32, 32));
         cursor.Position = hasCursor ? new Vector2(cursorRect!.X + data.Padding, cursorRect.Y + data.Padding) : Vector2.Zero;
         cursor.Size = hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.Zero;
-        cursor.ZIndex = data.Z + 4;
-        // Cursor blink: RGSS3 oscillates the cursor alpha on a 32-frame triangle wave
-        // (255 down to 128 and back) while the window is active; a dimmed static
-        // highlight when inactive. AnimationTick is advanced by Window#update per frame.
-        var cursorAlpha = GetCursorBlinkAlpha(data.Active, data.AnimationTick);
-        cursor.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, cursorAlpha * windowOpacity);
+        cursor.ZIndex = data.Z + 3;
+        // Cursor brightness follows the measured 40-frame cycle; contents opacity
+        // subtracts its lost brightness rather than multiplying the blink alpha.
+        var cursorAlpha = Math.Max(0.0f, GetCursorBlinkAlpha(data.Active, data.CursorTick) - (255 - data.ContentsOpacity) / 255.0f);
+        cursor.Visible = cursor.Visible && cursorAlpha > 0.0f;
+        if (cursor.Material is not ShaderMaterial)
+        {
+            using var cursorShader = GD.Load<Shader>("res://Shaders/WindowCursorShader.gdshader");
+            cursor.Material = new ShaderMaterial { Shader = cursorShader };
+            cursor.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
+        }
+        cursor.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, cursorAlpha);
+        ((ShaderMaterial)cursor.Material).SetShaderParameter("cursor_size", hasCursor ? new Vector2(cursorRect!.Width, cursorRect.Height) : Vector2.One);
 
         RenderWindowPause(node, data, width, height, windowOpacity);
         RenderWindowArrows(node, data, width, height, contentWidth, contentHeight, windowOpacity);
@@ -781,11 +893,10 @@ public sealed class GameRenderManager : IDisposable
     private static float GetCursorBlinkAlpha(bool active, int tick)
     {
         if (!active)
-            return 128.0f / 255.0f;
+            return 127.0f / 255.0f;
 
-        var phase = ((tick % 32) + 32) % 32;     // 0..31, guard against negatives
-        var distance = Math.Abs(phase - 16);     // 16 at phase 0, 0 at phase 16
-        var alpha = 128 + distance * 8;          // 128..256 -> clamp to 255
+        var phase = tick % 40;
+        var alpha = 255 - Math.Min(phase, 40 - phase) * 8;
         return Math.Min(255, alpha) / 255.0f;
     }
 
@@ -810,10 +921,16 @@ public sealed class GameRenderManager : IDisposable
 
         var frame = (data.AnimationTick / 16) % PauseFrameRects.Length;
         pause.Texture = GetRegionTexture(data.Windowskin, PauseFrameRects[frame]);
+        if (pause.Material is not ShaderMaterial)
+        {
+            using var pauseShader = GD.Load<Shader>("res://Shaders/WindowPauseShader.gdshader");
+            pause.Material = new ShaderMaterial { Shader = pauseShader };
+            pause.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
+        }
         // Centred horizontally, sitting on the bottom border (16px tall sign).
         pause.Position = new Vector2(width / 2.0f - 8.0f, height - 16.0f);
-        pause.ZIndex = data.Z + 5;
-        pause.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
+        pause.ZIndex = data.Z + 4;
+        pause.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity * Math.Min(data.PauseFadeTick / 8.0f, 1.0f));
     }
 
     // Scroll arrows live in the centre of the windowskin border region (64,0,64,64).
@@ -860,7 +977,7 @@ public sealed class GameRenderManager : IDisposable
         arrow.Texture = GetRegionTexture(data.Windowskin, region);
         arrow.Position = position;
         arrow.ZIndex = data.Z + 5;
-        arrow.Modulate = new Godot.Color(1.0f, 1.0f, 1.0f, windowOpacity);
+        arrow.Modulate = Colors.White;
     }
 
     private static TextureRect GetOrCreatePlaneDrawable(PlaneDataNode node, int blendType)
@@ -872,6 +989,7 @@ public sealed class GameRenderManager : IDisposable
         drawable = new TextureRect
         {
             Name = "PlaneDrawable",
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.Scale,
             ZAsRelative = false,
@@ -880,6 +998,7 @@ public sealed class GameRenderManager : IDisposable
         };
         // A TextureRect gives the bare PlaneDataNode a viewport-sized quad; PlaneShader handles RGSS tiling via UV fract().
         node.AddChild(drawable);
+        drawable.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
         return drawable;
     }
 
@@ -897,11 +1016,13 @@ public sealed class GameRenderManager : IDisposable
             ZAsRelative = false,
             TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
         };
-        var shader = GD.Load<Shader>(shaderPath);
+        using var shader = GD.Load<Shader>(shaderPath);
         if (shader is not null)
             textureRect.Material = new ShaderMaterial { Shader = shader };
 
         node.AddChild(textureRect);
+        if (name == "WindowBackground")
+            textureRect.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
         return textureRect;
     }
 
@@ -938,11 +1059,12 @@ public sealed class GameRenderManager : IDisposable
             ZAsRelative = false,
             TextureRepeat = CanvasItem.TextureRepeatEnum.Disabled,
         };
-        var shader = GD.Load<Shader>("res://Shaders/SpriteMaskShader.gdshader");
+        using var shader = GD.Load<Shader>("res://Shaders/SpriteMaskShader.gdshader");
         if (shader is not null)
             contents.Material = new ShaderMaterial { Shader = shader };
 
         node.AddChild(contents);
+        contents.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport, ShowBehindParent = true });
         return contents;
     }
 
@@ -972,7 +1094,7 @@ public sealed class GameRenderManager : IDisposable
     // is to extract each sub-region ONCE into its own standalone ImageTexture via
     // Image.GetRegion(): NinePatchRect then nine-slices the isolated sub-image, and a
     // canvas_item shader's TEXTURE/UV map exactly to it with zero bleed.
-    private static readonly Dictionary<(ulong, int, int, int, int), ImageTexture> RegionTextureCache = new();
+    private static readonly Dictionary<(ulong, int, int, int, int), (long Revision, ImageTexture Texture)> RegionTextureCache = new();
 
     private static Texture2D? GetRegionTexture(BitmapData? bitmap, Rect2I region)
     {
@@ -980,25 +1102,37 @@ public sealed class GameRenderManager : IDisposable
             return null;
 
         var key = (bitmap.Image.GetInstanceId(), region.Position.X, region.Position.Y, region.Size.X, region.Size.Y);
-        if (RegionTextureCache.TryGetValue(key, out var cached) && cached is not null)
-            return cached;
+        if (RegionTextureCache.TryGetValue(key, out var cached) && cached.Revision == bitmap.TextureRevision)
+            return cached.Texture;
 
         var img = bitmap.Image;
         var clamped = region.Intersection(new Rect2I(0, 0, img.GetWidth(), img.GetHeight()));
         if (clamped.Size.X <= 0 || clamped.Size.Y <= 0)
             return null;
 
-        var sub = img.GetRegion(clamped);
+        using var sub = img.GetRegion(clamped);
         if (sub.GetFormat() != Image.Format.Rgba8)
             sub.Convert(Image.Format.Rgba8);
 
-        var tex = ImageTexture.CreateFromImage(sub);
-        RegionTextureCache[key] = tex;
+        var tex = cached.Texture;
+        if (tex is null)
+            tex = ImageTexture.CreateFromImage(sub);
+        else
+            tex.Update(sub);
+        RegionTextureCache[key] = (bitmap.TextureRevision, tex);
         return tex;
     }
 
     private static Vector2 GetNodeRenderSize(Node node)
     {
+        var viewport = node switch
+        {
+            PlaneDataNode plane => plane.Data.Viewport,
+            TilemapDataNode tilemap => tilemap.Data.Viewport,
+            _ => null,
+        };
+        if (viewport is { IsDefault: false })
+            return new Vector2(Math.Max(1, viewport.Width), Math.Max(1, viewport.Height));
         if (node.GetViewport() is SubViewport subViewport && subViewport.Size.X > 0 && subViewport.Size.Y > 0)
             return new Vector2(subViewport.Size.X, subViewport.Size.Y);
 
@@ -1062,6 +1196,9 @@ public sealed class GameRenderManager : IDisposable
             || data.CachedAnimFrameA != animA
             || data.CachedAnimFrameC != animC
             || data.CachedFlashAlpha != flashAlpha
+            || data.CachedMapRevision != data.MapData.Revision
+            || data.CachedFlagsRevision != (data.Flags?.Revision ?? 0)
+            || data.CachedFlashRevision != (data.FlashData?.Revision ?? 0)
             || data.CachedMapDataId != mapId;
 
         if (needComposite)
@@ -1073,6 +1210,9 @@ public sealed class GameRenderManager : IDisposable
             data.CachedAnimFrameC = animC;
             data.CachedFlashAlpha = flashAlpha;
             data.CachedMapDataId = mapId;
+            data.CachedMapRevision = data.MapData.Revision;
+            data.CachedFlagsRevision = data.Flags?.Revision ?? 0;
+            data.CachedFlashRevision = data.FlashData?.Revision ?? 0;
             data.LayersDirty = false;
         }
 
@@ -1093,8 +1233,8 @@ public sealed class GameRenderManager : IDisposable
         var pixelW = tilesW * TilemapRenderer.TileSize;
         var pixelH = tilesH * TilemapRenderer.TileSize;
 
-        var groundImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
-        var overImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
+        using var groundImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
+        using var overImg = Image.CreateEmpty(pixelW, pixelH, false, Image.Format.Rgba8);
         groundImg.Fill(Colors.Transparent);
         overImg.Fill(Colors.Transparent);
 
@@ -1177,7 +1317,7 @@ public sealed class GameRenderManager : IDisposable
             return;
 
         var flag = GetTileFlag(data.Flags, tileId);
-        var target = (flag & TilemapRenderer.OverPlayerFlag) != 0 ? overImg : groundImg;
+        var target = z == 2 && (flag & TilemapRenderer.OverPlayerFlag) != 0 ? overImg : groundImg;
         var isTable = (flag & TilemapRenderer.TableFlag) != 0;
         TilemapRenderer.DrawTile(target, px, py, tileId, data.Bitmaps, animA, animC, isTable);
     }
@@ -1206,7 +1346,9 @@ public sealed class GameRenderManager : IDisposable
         }
         else
         {
+            var previous = sprite.Texture;
             sprite.Texture = ImageTexture.CreateFromImage(img);
+            previous?.Dispose();
         }
     }
 
@@ -1214,7 +1356,10 @@ public sealed class GameRenderManager : IDisposable
     {
         var layer = node.GetNodeOrNull<Sprite2D>(name);
         if (layer is not null)
+        {
+            layer.ZIndex = zIndex;
             return layer;
+        }
 
         layer = new Sprite2D
         {
@@ -1234,10 +1379,10 @@ public sealed class GameRenderManager : IDisposable
 
     private static ShaderMaterial CreatePlaneMaterial(int blendType)
     {
-        var shader = blendType switch
+        using var shader = blendType switch
         {
             1 => CreatePlaneShaderVariant("blend_add"),
-            2 => CreatePlaneShaderVariant("blend_sub"),
+            2 => CreatePlaneShaderVariant("blend_mix"),
             _ => GD.Load<Shader>("res://Shaders/PlaneShader.gdshader"),
         };
 
@@ -1260,48 +1405,12 @@ public sealed class GameRenderManager : IDisposable
     {
         return new Shader
         {
-            Code = $$"""
-shader_type canvas_item;
-render_mode {{blendMode}}, unshaded;
-
-uniform vec4 mix_color = vec4(0.0, 0.0, 0.0, 0.0);
-uniform vec4 tone = vec4(0.0, 0.0, 0.0, 0.0);
-uniform vec2 tile_scale = vec2(1.0, 1.0);
-uniform vec2 uv_offset = vec2(0.0, 0.0);
-uniform vec2 scroll_speed = vec2(0.0, 0.0);
-
-const vec3 LUMA = vec3(0.299, 0.587, 0.114);
-
-void fragment() {
-    vec2 uv = UV * tile_scale;
-    uv.y -= tile_scale.y - 1.0;
-    uv += vec2(uv_offset.x, -uv_offset.y) + (scroll_speed * TIME);
-    uv = fract(uv);
-
-    vec4 col = texture(TEXTURE, uv);
-
-    float luma = dot(col.rgb, LUMA);
-    col.rgb = mix(col.rgb, vec3(luma), tone.a);
-    col.rgb += tone.rgb;
-    col.rgb = mix(col.rgb, mix_color.rgb, mix_color.a);
-
-    COLOR = col;
-}
-""",
+            Code = GD.Load<Shader>("res://Shaders/PlaneShader.gdshader").Code.Replace("blend_mix", blendMode),
         };
     }
 
     private static Vector2 GetRenderSize()
-    {
-        if (GlobalConfig.Instance.LegacyMode)
-            return new Vector2(GlobalConfig.Instance.LegacyModeWidth, GlobalConfig.Instance.LegacyModeHeight);
-
-        var root = Engine.GetMainLoop() is SceneTree tree ? tree.Root : null;
-        if (root is not null)
-            return root.GetVisibleRect().Size;
-
-        return DisplayServer.WindowGetSize();
-    }
+        => RubyClasses.Graphics.GetRenderSize();
 
     public float GetGraphicsBrightness() => this.graphicsBrightness;
 
@@ -1331,9 +1440,9 @@ void fragment() {
         this.fadeFramesElapsed = 0;
         this.brightnessFadeActive = true;
 
-        // Do NOT jump on the call frame; hold current brightness. The ramp advances
-        // starting next frame in Update().
-        this.ApplyGraphicsBrightness(this.graphicsBrightness);
+        // The first Graphics.update yields after this call, so its frame must
+        // already carry the first fade step. The last yielded frame reaches target.
+        this.TickBrightnessFade();
     }
 
     private void ApplyGraphicsBrightness(float brightness)
@@ -1391,7 +1500,7 @@ void fragment() {
         if (viewport is null)
             return;
 
-        var image = viewport.GetTexture()?.GetImage();
+        using var image = viewport.GetTexture()?.GetImage();
         if (image is null || image.IsEmpty())
             return;
 
@@ -1402,12 +1511,9 @@ void fragment() {
         this.frozenTexture = ImageTexture.CreateFromImage(image);
     }
 
-    // Begin a masked dissolve of the frozen (old) screen toward black, revealed through
-    // the mask over `durationFrames`. This matches native VX Ace: the BattleStart mask
-    // dissolves the old map away (the new battle scene does not exist yet during this
-    // transition -- it is built only after the old scene's fiber fully terminates), then
-    // the battle appears. Ownership of maskTexture transfers here.
-    public void StartTransition(Texture2D maskTexture, int vague, int durationFrames)
+    // Reveal the current scene from the frozen frame. A null mask is a uniform
+    // crossfade; a mask controls the spatial reveal. Ownership transfers here.
+    public void StartTransition(Texture2D? maskTexture, int vague, int durationFrames)
     {
         this.brightnessFadeActive = false;
         this.graphicsBrightness = 1.0f;
@@ -1423,7 +1529,7 @@ void fragment() {
         // Fall back to an instant finish if we can't run a real dissolve.
         if (durationFrames <= 0 || this.postprocessQuad is null || this.transitionMaterial is null || this.frozenTexture is null)
         {
-            maskTexture.Dispose();
+            maskTexture?.Dispose();
             ReleaseTexture(ref this.frozenTexture);
             if (this.postprocessQuad is not null && this.postprocessMaterial is not null)
                 this.postprocessQuad.Material = this.postprocessMaterial;
@@ -1439,23 +1545,15 @@ void fragment() {
         this.transitionVague = Math.Max(vague / 256.0f, 0.0001f);
         this.transitionActive = true;
 
-        // The "new" side is a 1x1 black texture: the mask reveals black where it has
-        // progressed, dissolving the old scene away. Set uniforms BEFORE the material swap
-        // to avoid a one-frame flicker.
-        this.newTexture = CreateBlackTexture();
-        this.transitionMaterial.SetShaderParameter("frozen_tex", this.frozenTexture);
-        this.transitionMaterial.SetShaderParameter("new_tex", this.newTexture);
-        this.transitionMaterial.SetShaderParameter("transition_tex", this.maskTexture);
+        using var frozenTextureParameter = Variant.From(this.frozenTexture);
+        using var maskTextureParameter = Variant.From(this.maskTexture);
+        this.transitionMaterial.SetShaderParameter("frozen_tex", frozenTextureParameter);
+        this.transitionMaterial.SetShaderParameter("transition_tex", maskTextureParameter);
+        this.transitionMaterial.SetShaderParameter("has_mask", maskTexture is not null);
         this.transitionMaterial.SetShaderParameter("vague", this.transitionVague);
         this.transitionMaterial.SetShaderParameter("progress", 0.0f);
         this.postprocessQuad.Material = this.transitionMaterial;
-    }
-
-    private static Texture2D CreateBlackTexture()
-    {
-        var img = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
-        img.SetPixel(0, 0, Colors.Black);
-        return ImageTexture.CreateFromImage(img);
+        this.TickTransition();
     }
 
     private void TickTransition()
@@ -1489,7 +1587,6 @@ void fragment() {
 
         ReleaseTexture(ref this.maskTexture);
         ReleaseTexture(ref this.frozenTexture);
-        ReleaseTexture(ref this.newTexture);
 
         if (markFinished)
             this.transitionFinishedThisFrame = true;
@@ -1521,25 +1618,109 @@ void fragment() {
     private static float NormalizeColorChannel(float value)
         => Math.Clamp(value > 1.0f ? value / 255.0f : value, 0.0f, 1.0f);
 
-    private sealed record ViewportRenderEntry(SubViewport SubViewport, Node2D SubViewportRoot, Sprite2D Wrapper);
+    private sealed record ViewportRenderEntry(Node2D SubViewportRoot, ColorRect Wrapper, Control Clip);
 }
 
 public partial class SpriteDataNode : Sprite2D
 {
     public SpriteData Data { get; set; } = null!;
+    public BackBufferCopy BackgroundCopy { get; set; } = null!;
+    public int RotationPadding { get; set; }
+    private SpriteRotationRaster? rotation;
+    private SpriteWaveRaster? wave;
+    private int blendType;
+
+    public void SetBlendType(int value)
+    {
+        if (this.blendType == value)
+            return;
+        var mode = value == 1 ? "blend_add" : "blend_mix";
+        var code = GD.Load<Shader>("res://Shaders/SpriteShader.gdshader").Code.Replace("blend_mix", mode);
+        if (value == 1)
+            code = code.Replace("if (compose_background && col.a > 0.0 && col.a < 1.0)", "if (false)");
+        if (value == 2)
+            code = code.Replace("if (compose_background && col.a > 0.0 && col.a < 1.0)", "if (false)")
+                .Replace("COLOR = col;", "COLOR = vec4(max(texture(background_texture, SCREEN_UV).rgb - col.rgb * col.a, vec3(0.0)), 1.0);");
+        var shader = new Shader { Code = code };
+        this.Material?.Dispose();
+        this.Material = new ShaderMaterial { Shader = shader };
+        this.blendType = value;
+    }
+
+    public void RenderRotation()
+    {
+        this.rotation ??= new SpriteRotationRaster();
+        this.rotation.Apply(this, this.Data);
+    }
+
+    public void RenderWave()
+    {
+        this.wave ??= new SpriteWaveRaster();
+        this.wave.Apply(this, this.Data);
+    }
+
+    public override void _ExitTree()
+    {
+        var material = this.Material;
+        this.Material = null;
+        material?.Dispose();
+        this.rotation?.Dispose();
+        this.rotation = null;
+        this.wave?.Dispose();
+        this.wave = null;
+    }
 }
 
 public partial class PlaneDataNode : Node2D
 {
     public PlaneData Data { get; set; } = null!;
+
+    public override void _ExitTree()
+    {
+        foreach (var child in GetChildren())
+        {
+            if (child is CanvasItem item)
+            {
+                var material = item.Material;
+                item.Material = null;
+                material?.Dispose();
+            }
+        }
+    }
 }
 
 public partial class WindowDataNode : Node2D
 {
     public WindowData Data { get; set; } = null!;
+
+    public override void _ExitTree()
+    {
+        foreach (var child in GetChildren())
+        {
+            if (child is CanvasItem item)
+            {
+                var material = item.Material;
+                item.Material = null;
+                material?.Dispose();
+            }
+        }
+    }
 }
 
 public partial class TilemapDataNode : Node2D
 {
     public TilemapData Data { get; set; } = null!;
+
+    public override void _ExitTree()
+    {
+        foreach (var child in GetChildren())
+        {
+            if (child is Sprite2D sprite)
+            {
+                var texture = sprite.Texture;
+                sprite.Texture = null;
+                texture?.Dispose();
+            }
+        }
+    }
 }

@@ -3,6 +3,7 @@ require 'type_check_util'
 
 class Font
   include TypeCheckUtil
+  extend TypeCheckUtil
 
   attr_reader :__handler__
 
@@ -26,10 +27,8 @@ class Font
 
       if value.is_a? Array
         value.each { |v| check_type(v, String) }
-        @default_name = value
-      else
-        @default_name = [value]
       end
+      @default_name = value
 
     end
 
@@ -42,7 +41,7 @@ class Font
     end
   end
 
-  @default_name = ["Arial"]
+  @default_name = Unity.cn_ver_rmva ? "nsimsun" : "VL Gothic"
   @default_size = 24
   @default_bold = false
   @default_italic = false
@@ -63,12 +62,13 @@ class Font
     if args.size == 0
       name = Font.default_name
       size = Font.default_size
-      @__handler__ = Unity::Font.new_ns(name, size)
+      @__handler__ = Unity::Font.new_ns(name.is_a?(Array) ? name : [name], size)
     elsif args.length == 1
       arg, = args
       if arg.is_a? Unity::Font
         @__handler__ = arg
-        name = @__handler__.name
+        @name = @__handler__.name
+        return
       elsif arg.is_a? String
         name = [arg]
         size = Font.default_size
@@ -93,7 +93,7 @@ class Font
       raise TypeError, "Invalid argument type"
     end
 
-    @name = name
+    @name = args.empty? ? Font.default_name : (args[0].is_a?(Unity::Font) ? name : args[0])
     @__handler__.bold = Font.default_bold
     @__handler__.italic = Font.default_italic
     @__handler__.shadow = Font.default_shadow
@@ -129,11 +129,9 @@ class Font
 
     if value.is_a? Array
       value.each { |v| check_type(v, String) }
-      @name = value
-    else
-      @name = [value]
     end
-    @__handler__.name = @name
+    @name = value
+    @__handler__.name = value.is_a?(Array) ? value : [value]
   end
 
   def eql?(other)
@@ -164,14 +162,11 @@ class Font
   end
 
   def self.create_default_font
-    Font.new("Arial", 24)
+    Font.new
   end
 
-  # RGSS3 Font.exist?(name) probes system font availability. The engine renders with
-  # font fallback (Arial substitute) when a face is missing, so report availability
-  # permissively rather than failing scripts that gate on this check.
   def self.exist?(name)
     TypeCheckUtil.check_type(name, String)
-    true
+    Unity::Font.exist?(name)
   end
 end

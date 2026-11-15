@@ -1,4 +1,3 @@
-using System.Numerics;
 using MRuby.Library.Language;
 using MRuby.Library.Mapper;
 using RGSSGodot;
@@ -7,30 +6,29 @@ namespace RGSSUnity.RubyClasses
 {
     public class ToneData : RubyData
     {
-        public Vector4 Tone;
+        public double RedValue;
+        public double GreenValue;
+        public double BlueValue;
+        public double GrayValue;
 
         public float Red
         {
-            get => Tone.X;
-            set => Tone.X = value;
+            get => (float)(RedValue / 255.0);
         }
 
         public float Green
         {
-            get => Tone.Y;
-            set => Tone.Y = value;
+            get => (float)(GreenValue / 255.0);
         }
 
         public float Blue
         {
-            get => Tone.Z;
-            set => Tone.Z = value;
+            get => (float)(BlueValue / 255.0);
         }
 
         public float Gray
         {
-            get => Tone.W;
-            set => Tone.W = value;
+            get => (float)(GrayValue / 255.0);
         }
 
         public ToneData(RbState state) : base(state)
@@ -41,11 +39,14 @@ namespace RGSSUnity.RubyClasses
     [RbClass("Tone", "Object", "Unity")]
     public static class Tone
     {
-        public static RbValue CreateTone(RbState state, float rVal, float gVal, float bVal, float grayVal)
+        public static RbValue CreateTone(RbState state, double rVal, double gVal, double bVal, double grayVal)
         {
             var tone = new ToneData(state)
             {
-                Tone = new Vector4(rVal / 255.0f, gVal / 255.0f, bVal / 255.0f, grayVal / 255.0f)
+                RedValue = rVal,
+                GreenValue = gVal,
+                BlueValue = bVal,
+                GrayValue = grayVal,
             };
             var cls = RubyScriptManager.Instance.GetClassUnderUnityModule("Tone");
             var res = cls.NewObjectWithRData(tone);
@@ -60,7 +61,7 @@ namespace RGSSUnity.RubyClasses
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var grayVal = gray.IsInt ? gray.ToIntUnchecked() : gray.ToFloatUnchecked();
 
-            var res = CreateTone(state, (float)rVal, (float)gVal, (float)bVal, (float)grayVal);
+            var res = CreateTone(state, rVal, gVal, bVal, grayVal);
             return res;
         }
 
@@ -73,10 +74,10 @@ namespace RGSSUnity.RubyClasses
             var grayVal = gray.IsInt ? gray.ToIntUnchecked() : gray.ToFloatUnchecked();
 
             var toneData = self.GetRDataObject<ToneData>();
-            toneData.Red = (float)rVal / 255.0f;
-            toneData.Green = (float)gVal / 255.0f;
-            toneData.Blue = (float)bVal / 255.0f;
-            toneData.Gray = (float)grayVal / 255.0f;
+            toneData.RedValue = rVal;
+            toneData.GreenValue = gVal;
+            toneData.BlueValue = bVal;
+            toneData.GrayValue = grayVal;
             return state.RbNil;
         }
 
@@ -84,7 +85,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetR(RbState state, RbValue self)
         {
             var toneData = self.GetRDataObject<ToneData>();
-            return (toneData.Red * 255.0f).ToValue(state);
+            return toneData.RedValue.ToValue(state);
         }
 
         [RbInstanceMethod("red=")]
@@ -92,7 +93,7 @@ namespace RGSSUnity.RubyClasses
         {
             var rVal = r.IsInt ? r.ToIntUnchecked() : r.ToFloatUnchecked();
             var toneData = self.GetRDataObject<ToneData>();
-            toneData.Red = (float)rVal / 255.0f;
+            toneData.RedValue = rVal;
             return state.RbNil;
         }
 
@@ -100,7 +101,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetG(RbState state, RbValue self)
         {
             var toneData = self.GetRDataObject<ToneData>();
-            return (toneData.Green * 255.0f).ToValue(state);
+            return toneData.GreenValue.ToValue(state);
         }
 
         [RbInstanceMethod("green=")]
@@ -108,7 +109,7 @@ namespace RGSSUnity.RubyClasses
         {
             var gVal = g.IsInt ? g.ToIntUnchecked() : g.ToFloatUnchecked();
             var toneData = self.GetRDataObject<ToneData>();
-            toneData.Green = (float)gVal / 255.0f;
+            toneData.GreenValue = gVal;
             return state.RbNil;
         }
 
@@ -116,7 +117,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetB(RbState state, RbValue self)
         {
             var toneData = self.GetRDataObject<ToneData>();
-            return (toneData.Blue * 255.0f).ToValue(state);
+            return toneData.BlueValue.ToValue(state);
         }
 
         [RbInstanceMethod("blue=")]
@@ -124,7 +125,7 @@ namespace RGSSUnity.RubyClasses
         {
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var toneData = self.GetRDataObject<ToneData>();
-            toneData.Blue = (float)bVal / 255.0f;
+            toneData.BlueValue = bVal;
             return state.RbNil;
         }
 
@@ -132,7 +133,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetGray(RbState state, RbValue self)
         {
             var toneData = self.GetRDataObject<ToneData>();
-            return (toneData.Gray * 255.0f).ToValue(state);
+            return toneData.GrayValue.ToValue(state);
         }
 
         [RbInstanceMethod("gray=")]
@@ -140,7 +141,7 @@ namespace RGSSUnity.RubyClasses
         {
             var grayVal = gray.IsInt ? gray.ToIntUnchecked() : gray.ToFloatUnchecked();
             var toneData = self.GetRDataObject<ToneData>();
-            toneData.Gray = (float)grayVal / 255.0f;
+            toneData.GrayValue = grayVal;
             return state.RbNil;
         }
     }

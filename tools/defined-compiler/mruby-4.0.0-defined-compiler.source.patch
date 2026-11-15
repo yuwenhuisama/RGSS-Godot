@@ -1,0 +1,1257 @@
+diff --git a/include/mruby/internal.h b/include/mruby/internal.h
+index 4b06dd522..4d8428c4e 100644
+--- a/include/mruby/internal.h
++++ b/include/mruby/internal.h
+@@ -181,6 +181,9 @@ void mrb_vm_special_set(mrb_state*, mrb_sym, mrb_value);
+ mrb_value mrb_vm_cv_get(mrb_state*, mrb_sym);
+ void mrb_vm_cv_set(mrb_state*, mrb_sym, mrb_value);
+ mrb_value mrb_vm_const_get(mrb_state*, mrb_sym);
++mrb_bool mrb_vm_const_defined_p(mrb_state*, mrb_sym);
++mrb_bool mrb_gv_defined_p(mrb_state*, mrb_sym);
++mrb_bool mrb_vm_cv_defined_p(mrb_state*, mrb_sym);
+ size_t mrb_obj_iv_tbl_memsize(mrb_value);
+ void mrb_obj_iv_set_force(mrb_state *mrb, struct RObject *obj, mrb_sym sym, mrb_value v);
+ mrb_value mrb_mod_constants(mrb_state *mrb, mrb_value mod);
+@@ -196,6 +199,8 @@ mrb_value mrb_exc_const_get(mrb_state *mrb, mrb_sym sym);
+ /* GC functions */
+ void mrb_gc_mark_gv(mrb_state*);
+ void mrb_gc_free_gv(mrb_state*);
++void mrb_backref_frame_pop(mrb_state *mrb, struct mrb_context *c, mrb_callinfo *ci);
++void mrb_backref_context_free(mrb_state *mrb, struct mrb_context *c);
+ size_t mrb_gc_mark_iv(mrb_state*, struct RObject*);
+ void mrb_gc_free_iv(mrb_state*, struct RObject*);
+ 
+@@ -216,6 +221,19 @@ mrb_value mrb_object_exec(mrb_state *mrb, mrb_value self, struct RClass *target_
+ mrb_value mrb_mod_module_eval(mrb_state*, mrb_value);
+ mrb_value mrb_f_send(mrb_state *mrb, mrb_value self);
+ mrb_value mrb_f_public_send(mrb_state *mrb, mrb_value self);
++mrb_bool mrb_respond_to_missing_p(mrb_state *mrb, mrb_value obj, mrb_sym mid, mrb_bool priv);
++
++enum mrb_defined_type {
++  MRB_DEFINED_CONST = 1,
++  MRB_DEFINED_MCONST = 2,
++  MRB_DEFINED_GVAR = 3,
++  MRB_DEFINED_IVAR = 4,
++  MRB_DEFINED_CVAR = 5,
++  MRB_DEFINED_FCALL = 6,
++  MRB_DEFINED_CALL = 7,
++  MRB_DEFINED_YIELD = 8,
++  MRB_DEFINED_SUPER = 9,
++};
+ 
+ #ifdef MRB_USE_BIGINT
+ mrb_value mrb_bint_new_int(mrb_state *mrb, mrb_int x);
+diff --git a/include/mruby/ops.h b/include/mruby/ops.h
+index 5ded349e8..7616ab062 100644
+--- a/include/mruby/ops.h
++++ b/include/mruby/ops.h
+@@ -125,6 +125,7 @@ OPCODE(ALIAS,      BB)       /* alias_method(target_class,Syms[a],Syms[b]) */
+ OPCODE(UNDEF,      B)        /* undef_method(target_class,Syms[a]) */
+ OPCODE(SCLASS,     B)        /* R[a] = R[a].singleton_class */
+ OPCODE(TCLASS,     B)        /* R[a] = target_class */
++OPCODE(DEFINED,    BBB)      /* R[a] = defined?(R[a],Syms[b],c) */
+ OPCODE(DEBUG,      BBB)      /* print a,b,c */
+ OPCODE(ERR,        B)        /* raise(LocalJumpError, Pool[a]) */
+ OPCODE(EXT1,       Z)        /* make 1st operand (a) 16bit */
+diff --git a/mrbgems/mruby-compiler/core/codegen.c b/mrbgems/mruby-compiler/core/codegen.c
+index 48cae6569..3ea5864da 100644
+--- a/mrbgems/mruby-compiler/core/codegen.c
++++ b/mrbgems/mruby-compiler/core/codegen.c
+@@ -6240,17 +6240,250 @@ codegen_colon3(codegen_scope *s, node *varnode, int val)
+ }
+ 
+ static void
+-codegen_defined(codegen_scope *s, node *varnode, int val)
++gen_defined_lit(codegen_scope *s, const char *lit)
+ {
+-  // DEFINED nodes are rarely used - generate basic implementation
+-  (void)varnode; // suppress unused warning
+-  if (val) {
+-    // For now, just return nil (defined? is complex to implement correctly)
++  int off = new_lit_cstr(s, lit);
++  genop_2(s, OP_STRING, cursp(), off);
++  push();
++}
++
++static void
++gen_defined_protected_recv(codegen_scope *s, node *recv, int sym, enum mrb_defined_type kind, int safe)
++{
++  int catch_entry = catch_handler_new(s);
++  int begin = s->pc;
++  int skip = 0;
++
++  codegen(s, recv, VAL);
++  pop();
++  if (safe) {
++    skip = genjmp2_0(s, OP_JMPNIL, cursp(), VAL);
++  }
++  genop_3(s, OP_DEFINED, cursp(), sym, (uint16_t)kind);
++  if (safe) {
++    dispatch(s, skip);
++  }
++  int end = s->pc;
++  uint32_t done = genjmp_0(s, OP_JMP);
++  catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
++  genop_1(s, OP_LOADNIL, cursp());
++  dispatch(s, done);
++  push();
++}
++
++static void codegen_defined_expr(codegen_scope *s, node *expr);
++
++static void
++codegen_defined_array(codegen_scope *s, node *elements)
++{
++  uint32_t fail_pos = JMPLINK_START;
++  node *e = elements;
++
++  while (e) {
++    if (e->car) {
++      if (is_splat_node(e->car)) {
++        gen_defined_lit(s, "expression");
++        return;
++      }
++      codegen_defined_expr(s, e->car);
++      pop();
++      fail_pos = genjmp2(s, OP_JMPNIL, cursp(), fail_pos, VAL);
++    }
++    e = e->cdr;
++  }
++  gen_defined_lit(s, "expression");
++  if (fail_pos != JMPLINK_START) {
++    uint32_t done = genjmp_0(s, OP_JMP);
++    pop();
++    dispatch_linked(s, fail_pos);
+     genop_1(s, OP_LOADNIL, cursp());
++    dispatch(s, done);
++    push();
++  }
++}
++
++static void
++codegen_defined_expr(codegen_scope *s, node *expr)
++{
++  while (expr && (node_type(expr) == NODE_STMTS || node_type(expr) == NODE_BEGIN)) {
++    if (node_type(expr) == NODE_BEGIN) {
++      expr = begin_node(expr)->body;
++      continue;
++    }
++    node *list = stmts_node(expr)->stmts;
++    if (!list) {
++      expr = NULL;
++      break;
++    }
++    if (!list->cdr) {
++      expr = list->car;
++      continue;
++    }
++    gen_defined_lit(s, "expression");
++    return;
++  }
++
++  if (!expr) {
++    gen_defined_lit(s, "expression");
++    return;
++  }
++
++  switch (node_type(expr)) {
++  case NODE_NIL:
++    gen_defined_lit(s, "nil");
++    break;
++
++  case NODE_SELF:
++    gen_defined_lit(s, "self");
++    break;
++
++  case NODE_TRUE:
++    gen_defined_lit(s, "true");
++    break;
++
++  case NODE_FALSE:
++    gen_defined_lit(s, "false");
++    break;
++
++  case NODE_ZARRAY:
++    gen_defined_lit(s, "expression");
++    break;
++
++  case NODE_ARRAY:
++    codegen_defined_array(s, array_node(expr)->elements);
++    break;
++
++  case NODE_LVAR:
++  case NODE_DVAR:
++  case NODE_NVAR:
++    gen_defined_lit(s, "local-variable");
++    break;
++
++  case NODE_CONST:
++    genop_3(s, OP_DEFINED, cursp(), sym_idx(s, const_node(expr)->symbol), MRB_DEFINED_CONST);
++    push();
++    break;
++
++  case NODE_COLON3:
++    genop_1(s, OP_OCLASS, cursp());
++    genop_3(s, OP_DEFINED, cursp(), sym_idx(s, colon3_node(expr)->name), MRB_DEFINED_MCONST);
++    push();
++    break;
++
++  case NODE_COLON2:
++    {
++      struct mrb_ast_colon2_node *c2 = colon2_node(expr);
++      gen_defined_protected_recv(s, c2->base, sym_idx(s, c2->name), MRB_DEFINED_MCONST, 0);
++    }
++    break;
++
++  case NODE_GVAR:
++    genop_3(s, OP_DEFINED, cursp(), sym_idx(s, var_node(expr)->symbol), MRB_DEFINED_GVAR);
+     push();
++    break;
++
++  case NODE_NTH_REF:
++    {
++      mrb_value str = mrb_format(s->mrb, "$%d", nth_ref_node(expr)->nth);
++      int sym = sym_idx(s, mrb_intern_str(s->mrb, str));
++      genop_3(s, OP_DEFINED, cursp(), sym, MRB_DEFINED_GVAR);
++      push();
++    }
++    break;
++
++  case NODE_BACK_REF:
++    {
++      char buf[] = {'$', (char)back_ref_node(expr)->type};
++      int sym = sym_idx(s, mrb_intern(s->mrb, buf, sizeof(buf)));
++      genop_3(s, OP_DEFINED, cursp(), sym, MRB_DEFINED_GVAR);
++      push();
++    }
++    break;
++
++  case NODE_IVAR:
++    genop_3(s, OP_DEFINED, cursp(), sym_idx(s, var_node(expr)->symbol), MRB_DEFINED_IVAR);
++    push();
++    break;
++
++  case NODE_CVAR:
++    genop_3(s, OP_DEFINED, cursp(), sym_idx(s, var_node(expr)->symbol), MRB_DEFINED_CVAR);
++    push();
++    break;
++
++  case NODE_ASGN:
++    {
++      node *lhs = asgn_node(expr)->lhs;
++      if (lhs && node_type(lhs) == NODE_CALL) {
++        struct mrb_ast_call_node *call = call_node(lhs);
++        int sym = sym_idx(s, attrsym(s, call->method_name));
++        if (!call->receiver) {
++          genop_3(s, OP_DEFINED, cursp(), sym, MRB_DEFINED_FCALL);
++          push();
++        }
++        else {
++          gen_defined_protected_recv(s, call->receiver, sym, MRB_DEFINED_CALL, call->safe_call);
++        }
++      }
++      else {
++        gen_defined_lit(s, "assignment");
++      }
++    }
++    break;
++
++  case NODE_OP_ASGN:
++  case NODE_MASGN:
++    gen_defined_lit(s, "assignment");
++    break;
++
++  case NODE_CALL:
++    {
++      struct mrb_ast_call_node *call = call_node(expr);
++      int sym = sym_idx(s, call->method_name);
++      if (!call->receiver) {
++        genop_3(s, OP_DEFINED, cursp(), sym, MRB_DEFINED_FCALL);
++        push();
++      }
++      else {
++        gen_defined_protected_recv(s, call->receiver, sym, MRB_DEFINED_CALL, call->safe_call);
++      }
++    }
++    break;
++
++  case NODE_YIELD:
++    {
++      codegen_scope *s2 = s;
++      while (s2 && !s2->mscope) {
++        s2 = s2->prev;
++      }
++      if (!s2 && s->parser->upper == NULL) {
++        genop_1(s, OP_LOADNIL, cursp());
++      }
++      else {
++        genop_3(s, OP_DEFINED, cursp(), 0, MRB_DEFINED_YIELD);
++      }
++      push();
++    }
++    break;
++
++  case NODE_SUPER:
++  case NODE_ZSUPER:
++    genop_3(s, OP_DEFINED, cursp(), 0, MRB_DEFINED_SUPER);
++    push();
++    break;
++
++  default:
++    gen_defined_lit(s, "expression");
++    break;
+   }
+ }
+ 
++static void
++codegen_defined(codegen_scope *s, node *varnode, int val)
++{
++  if (!val) return;
++  codegen_defined_expr(s, defined_node(varnode)->expr);
++}
++
+ static void
+ codegen_zsuper(codegen_scope *s, node *varnode, int val)
+ {
+diff --git a/mrbgems/mruby-compiler/core/keywords b/mrbgems/mruby-compiler/core/keywords
+index a5961b6b8..52b0e2aba 100644
+--- a/mrbgems/mruby-compiler/core/keywords
++++ b/mrbgems/mruby-compiler/core/keywords
+@@ -21,6 +21,7 @@ break,        {keyword_break,       keyword_break},       EXPR_MID
+ case,         {keyword_case,        keyword_case},        EXPR_VALUE
+ class,        {keyword_class,       keyword_class},       EXPR_CLASS
+ def,          {keyword_def,         keyword_def},         EXPR_FNAME
++defined?,     {keyword_defined,     keyword_defined},     EXPR_ARG
+ do,           {keyword_do,          keyword_do},          EXPR_BEG
+ else,         {keyword_else,        keyword_else},        EXPR_BEG
+ elsif,        {keyword_elsif,       keyword_elsif},       EXPR_VALUE
+diff --git a/mrbgems/mruby-compiler/core/parse.y b/mrbgems/mruby-compiler/core/parse.y
+index 74727feef..161829280 100644
+--- a/mrbgems/mruby-compiler/core/parse.y
++++ b/mrbgems/mruby-compiler/core/parse.y
+@@ -896,6 +896,15 @@ new_colon3(parser_state *p, mrb_sym c)
+   return (node*)colon3_node;
+ }
+ 
++/* struct: defined_node(expr) */
++static node*
++new_defined(parser_state *p, node *a)
++{
++  struct mrb_ast_defined_node *n = NEW_NODE(defined, NODE_DEFINED);
++  n->expr = a;
++  return (node*)n;
++}
++
+ /* struct: and_node(left, right) */
+ static node*
+ new_and(parser_state *p, node *a, node *b)
+@@ -2013,6 +2022,7 @@ prohibit_literals(parser_state *p, node *n)
+         keyword_class   "'class'"
+         keyword_module  "'module'"
+         keyword_def     "'def'"
++        keyword_defined "'defined?'"
+         keyword_begin   "'begin'"
+         keyword_if      "'if'"
+         keyword_unless  "'unless'"
+@@ -2155,6 +2165,7 @@ prohibit_literals(parser_state *p, node *n)
+ %nonassoc  modifier_if modifier_unless modifier_while modifier_until keyword_in
+ %left  keyword_or keyword_and
+ %right keyword_not
++%nonassoc keyword_defined
+ %right '=' tOP_ASGN
+ %left modifier_rescue
+ %right '?' ':' tLABEL_TAG
+@@ -2812,7 +2823,7 @@ reswords        : keyword__LINE__ | keyword__FILE__ | keyword__ENCODING__
+                 | keyword_BEGIN | keyword_END
+                 | keyword_alias | keyword_and | keyword_begin
+                 | keyword_break | keyword_case | keyword_class | keyword_def
+-                | keyword_do | keyword_else | keyword_elsif
++                | keyword_defined | keyword_do | keyword_else | keyword_elsif
+                 | keyword_end | keyword_ensure | keyword_false
+                 | keyword_for | keyword_in | keyword_module | keyword_next
+                 | keyword_nil | keyword_not | keyword_or | keyword_redo
+@@ -2861,6 +2872,10 @@ arg             : lhs '=' arg_rhs
+                       backref_error(p, $1);
+                       $$ = new_stmts(p, 0);
+                     }
++                | keyword_defined opt_nl arg
++                    {
++                      $$ = new_defined(p, $3);
++                    }
+                 | arg tDOT2 arg
+                     {
+                       $$ = new_dot2(p, $1, $3);
+@@ -3297,6 +3312,10 @@ primary         : literal
+                     {
+                       $$ = new_yield(p, $2);
+                     }
++                | keyword_defined opt_nl '(' expr rparen
++                    {
++                      $$ = new_defined(p, $4);
++                    }
+                 | keyword_not '(' expr rparen
+                     {
+                       $$ = call_uni_op(p, cond($3), "!");
+@@ -8566,6 +8585,13 @@ dump_node(mrb_state *mrb, node *tree, int offset)
+     printf("NODE_COLON3: ::%s\n", mrb_sym_name(mrb, colon3_node(tree)->name));
+     break;
+ 
++  case NODE_DEFINED:
++    printf("NODE_DEFINED:\n");
++    if (defined_node(tree)->expr) {
++      dump_node(mrb, defined_node(tree)->expr, offset+1);
++    }
++    break;
++
+   case NODE_HASH:
+     printf("NODE_HASH:\n");
+     {
+diff --git a/src/codedump.c b/src/codedump.c
+index 4b0f294ac..e4e1f9d60 100644
+--- a/src/codedump.c
++++ b/src/codedump.c
+@@ -615,6 +615,18 @@ codedump(mrb_state *mrb, const mrb_irep *irep, FILE *out)
+       fprintf(out, "MATCHERR\tR%d\n", a);
+       break;
+ 
++    CASE(OP_DEFINED, BBB):
++      switch ((enum mrb_defined_type)c) {
++      case MRB_DEFINED_YIELD:
++      case MRB_DEFINED_SUPER:
++        fprintf(out, "DEFINED\tR%d\t-\t%d\n", a, c);
++        break;
++      default:
++        fprintf(out, "DEFINED\tR%d\t:%s\t%d\n", a, mrb_sym_dump(mrb, irep->syms[b]), c);
++        break;
++      }
++      break;
++
+     CASE(OP_DEBUG, BBB):
+       fprintf(out, "DEBUG\t\t%d\t%d\t%d\n", a, b, c);
+       break;
+diff --git a/src/kernel.c b/src/kernel.c
+index 315124cba..1e94f3b0e 100644
+--- a/src/kernel.c
++++ b/src/kernel.c
+@@ -586,6 +586,17 @@ mrb_obj_remove_instance_variable(mrb_state *mrb, mrb_value self)
+  *  If the method is not defined, `respond_to_missing?`
+  *  method is called and the result is returned.
+  */
++mrb_bool
++mrb_respond_to_missing_p(mrb_state *mrb, mrb_value obj, mrb_sym mid, mrb_bool priv)
++{
++  mrb_sym rtm_id = MRB_SYM_Q(respond_to_missing);
++  if (!mrb_func_basic_p(mrb, obj, rtm_id, mrb_false)) {
++    mrb_value v = mrb_funcall_id(mrb, obj, rtm_id, 2, mrb_symbol_value(mid), mrb_bool_value(priv));
++    return mrb_bool(v);
++  }
++  return FALSE;
++}
++
+ static mrb_value
+ obj_respond_to(mrb_state *mrb, mrb_value self)
+ {
+@@ -595,11 +606,7 @@ obj_respond_to(mrb_state *mrb, mrb_value self)
+   mrb_get_args(mrb, "n|b", &id, &priv);
+   respond_to_p = mrb_respond_to(mrb, self, id);
+   if (!respond_to_p) {
+-    mrb_sym rtm_id = MRB_SYM_Q(respond_to_missing);
+-    if (!mrb_func_basic_p(mrb, self, rtm_id, mrb_false)) {
+-      mrb_value v = mrb_funcall_id(mrb, self, rtm_id, 2, mrb_symbol_value(id), mrb_bool_value(priv));
+-      return mrb_bool_value(mrb_bool(v));
+-    }
++    return mrb_bool_value(mrb_respond_to_missing_p(mrb, self, id, priv));
+   }
+   return mrb_bool_value(respond_to_p);
+ }
+diff --git a/src/state.c b/src/state.c
+index 642a1b963..e8c9bd789 100644
+--- a/src/state.c
++++ b/src/state.c
+@@ -174,6 +174,7 @@ MRB_API void
+ mrb_free_context(mrb_state *mrb, struct mrb_context *c)
+ {
+   if (!c) return;
++  mrb_backref_context_free(mrb, c);
+   mrb_free(mrb, c->stbase);
+   mrb_free(mrb, c->cibase);
+   mrb_free(mrb, c);
+diff --git a/src/variable.c b/src/variable.c
+index 45e4e02ea..ee845bf91 100644
+--- a/src/variable.c
++++ b/src/variable.c
+@@ -7,6 +7,7 @@
+ #include <mruby.h>
+ #include <mruby/array.h>
+ #include <mruby/class.h>
++#include <mruby/data.h>
+ #include <mruby/proc.h>
+ #include <mruby/string.h>
+ #include <mruby/variable.h>
+@@ -532,10 +533,397 @@ mark_tbl(mrb_state *mrb, iv_tbl *t)
+   iv_foreach(mrb, t, iv_mark_i, 0);
+ }
+ 
++/* Lexical-scope $~ (Regexp match backref) side table.
++ * Stored outside mrb_state / mrb_callinfo / REnv so sizeof(mrb_state) == 18864,
++ * offsetof(mrb_state, eStandardError_class) == 18800, and sizeof(REnv) <= sizeof(RVALUE)
++ * remain strictly unchanged. */
++struct mrb_backref_entry {
++  struct mrb_context *cxt; /* non-NULL while owned by active callinfo frame (cxt, ci_idx) */
++  ptrdiff_t ci_idx;
++  struct REnv *env;        /* non-NULL when promoted to heap lexical REnv */
++  mrb_value match;
++};
++
++struct mrb_backref_state {
++  mrb_state *mrb;
++  struct mrb_backref_entry *entries;
++  size_t len;
++  size_t capa;
++  struct mrb_backref_state *next;
++};
++
++static struct mrb_backref_state *mrb_backref_states = NULL;
++
++static struct mrb_backref_state*
++backref_state_find(mrb_state *mrb, mrb_bool create)
++{
++  struct mrb_backref_state *st = mrb_backref_states;
++  while (st) {
++    if (st->mrb == mrb) return st;
++    st = st->next;
++  }
++  if (!create) return NULL;
++  st = (struct mrb_backref_state*)mrb_malloc(mrb, sizeof(struct mrb_backref_state));
++  st->mrb = mrb;
++  st->entries = NULL;
++  st->len = 0;
++  st->capa = 0;
++  st->next = mrb_backref_states;
++  mrb_backref_states = st;
++  return st;
++}
++
++static void
++backref_put(mrb_state *mrb, struct mrb_context *cxt, ptrdiff_t ci_idx, struct REnv *env, mrb_value val)
++{
++  struct mrb_backref_state *st = backref_state_find(mrb, !mrb_nil_p(val));
++  if (!st) return;
++
++  for (size_t i = 0; i < st->len; i++) {
++    struct mrb_backref_entry *e = &st->entries[i];
++    if ((env && e->env == env) || (!env && e->cxt == cxt && e->ci_idx == ci_idx)) {
++      if (mrb_nil_p(val)) {
++        st->entries[i] = st->entries[--st->len];
++      }
++      else {
++        e->match = val;
++      }
++      return;
++    }
++  }
++  if (mrb_nil_p(val)) return;
++
++  if (st->len == st->capa) {
++    size_t new_capa = st->capa ? st->capa * 2 : 8;
++    st->entries = (struct mrb_backref_entry*)mrb_realloc(mrb, st->entries, new_capa * sizeof(struct mrb_backref_entry));
++    st->capa = new_capa;
++  }
++  st->entries[st->len].cxt = env ? NULL : cxt;
++  st->entries[st->len].ci_idx = env ? 0 : ci_idx;
++  st->entries[st->len].env = env;
++  st->entries[st->len].match = val;
++  st->len++;
++}
++
++static mrb_value
++backref_lookup(mrb_state *mrb, struct mrb_context *cxt, ptrdiff_t ci_idx, struct REnv *env)
++{
++  struct mrb_backref_state *st = backref_state_find(mrb, FALSE);
++  if (!st) return mrb_nil_value();
++
++  for (size_t i = 0; i < st->len; i++) {
++    struct mrb_backref_entry *e = &st->entries[i];
++    if ((env && e->env == env) || (!env && e->cxt == cxt && e->ci_idx == ci_idx)) {
++      return e->match;
++    }
++  }
++  return mrb_nil_value();
++}
++
++void
++mrb_backref_frame_pop(mrb_state *mrb, struct mrb_context *c, mrb_callinfo *ci)
++{
++  struct mrb_backref_state *st = backref_state_find(mrb, FALSE);
++  if (!st || !c || !c->cibase || !ci) return;
++
++  ptrdiff_t ci_idx = ci - c->cibase;
++  struct REnv *env = mrb_vm_ci_env(ci);
++
++  for (size_t i = 0; i < st->len; i++) {
++    struct mrb_backref_entry *e = &st->entries[i];
++    if (!e->env && e->cxt == c && e->ci_idx == ci_idx) {
++      if (env) {
++        /* Frame is closing with a captured lexical REnv: promote $~ ownership to env
++           (merging into any existing entry for env). */
++        mrb_value v = e->match;
++        st->entries[i] = st->entries[--st->len];
++        backref_put(mrb, NULL, 0, env, v);
++      }
++      else {
++        st->entries[i] = st->entries[--st->len];
++      }
++      return;
++    }
++  }
++}
++
++void
++mrb_backref_context_free(mrb_state *mrb, struct mrb_context *c)
++{
++  struct mrb_backref_state *st = backref_state_find(mrb, FALSE);
++  if (!st || !c) return;
++
++  size_t i = 0;
++  while (i < st->len) {
++    if (!st->entries[i].env && st->entries[i].cxt == c) {
++      st->entries[i] = st->entries[--st->len];
++    }
++    else {
++      i++;
++    }
++  }
++}
++
++static void
++backref_resolve_scope(mrb_state *mrb, struct mrb_context **out_cxt, ptrdiff_t *out_ci_idx, struct REnv **out_env)
++{
++  *out_cxt = NULL;
++  *out_ci_idx = 0;
++  *out_env = NULL;
++
++  struct mrb_context *c = mrb->c;
++  if (!c || !c->cibase || !c->ci) {
++    *out_cxt = mrb->root_c;
++    *out_ci_idx = 0;
++    return;
++  }
++
++  /* Skip CFunc frames (e.g. OnigRegexp#match, String#sub, Regexp.last_match) to reach the Ruby caller */
++  mrb_callinfo *ci = c->ci;
++  while (ci > c->cibase && (!ci->proc || MRB_PROC_CFUNC_P(ci->proc))) {
++    ci--;
++  }
++
++  const struct RProc *p = ci->proc;
++  if (!p || MRB_PROC_CFUNC_P(p)) {
++    *out_cxt = c;
++    *out_ci_idx = 0;
++    return;
++  }
++
++  /* `def` method / class / module / top-level scope: MRB_PROC_SCOPE without closure env */
++  if (MRB_PROC_SCOPE_P(p) && !MRB_PROC_ENV_P(p)) {
++    *out_cxt = c;
++    *out_ci_idx = ci - c->cibase;
++    return;
++  }
++
++  /* `define_method` invocation: MRB_PROC_SCOPE && MRB_PROC_STRICT && MRB_PROC_ENV_P.
++     In Ruby 1.9 / RGSS300, define_method has its own isolated method-frame $~ per call! */
++  if (MRB_PROC_SCOPE_P(p) && MRB_PROC_STRICT_P(p) && MRB_PROC_ENV_P(p)) {
++    *out_cxt = c;
++    *out_ci_idx = ci - c->cibase;
++    return;
++  }
++
++  /* Block, proc, lambda, or Kernel#eval string: walk lexical upper chain to the enclosing
++     method / class / top scope (or enclosing define_method frame). */
++  struct REnv *outer_env = NULL;
++  const struct RProc *cur = p;
++  while (cur) {
++    if (MRB_PROC_SCOPE_P(cur)) {
++      if (MRB_PROC_ENV_P(cur) && MRB_PROC_STRICT_P(cur)) {
++        /* Enclosing scope is a `define_method` proc: find its active frame on stack if any */
++        for (mrb_callinfo *scan = ci; scan > c->cibase; scan--) {
++          if (scan->proc == cur) {
++            *out_cxt = c;
++            *out_ci_idx = scan - c->cibase;
++            return;
++          }
++        }
++      }
++      break;
++    }
++    if (MRB_PROC_ENV_P(cur)) {
++      outer_env = MRB_PROC_ENV(cur);
++    }
++    cur = cur->upper;
++  }
++
++  if (outer_env) {
++    if (MRB_ENV_ONSTACK_P(outer_env) && outer_env->cxt) {
++      struct mrb_context *ec = outer_env->cxt;
++      if (ec->cibase && ec->ci) {
++        for (mrb_callinfo *scan = ec->ci; scan >= ec->cibase; scan--) {
++          if (mrb_vm_ci_env(scan) == outer_env) {
++            *out_cxt = ec;
++            *out_ci_idx = scan - ec->cibase;
++            return;
++          }
++        }
++      }
++    }
++    *out_env = outer_env;
++    return;
++  }
++
++  if (cur) {
++    for (mrb_callinfo *scan = ci; scan >= c->cibase; scan--) {
++      if (scan->proc == cur) {
++        *out_cxt = c;
++        *out_ci_idx = scan - c->cibase;
++        return;
++      }
++    }
++  }
++
++  /* Fiber created at top-level or fallback: root context base frame */
++  *out_cxt = mrb->root_c ? mrb->root_c : c;
++  *out_ci_idx = 0;
++}
++
++static mrb_bool
++match_data_value_p(mrb_state *mrb, mrb_value v)
++{
++  if (mrb_type(v) != MRB_TT_CDATA) return FALSE;
++  const mrb_data_type *dt = DATA_TYPE(v);
++  if (dt && dt->struct_name && strcmp(dt->struct_name, "OnigRegion") == 0) {
++    return TRUE;
++  }
++  const char *cn = mrb_obj_classname(mrb, v);
++  return cn && (strcmp(cn, "OnigMatchData") == 0 || strcmp(cn, "MatchData") == 0);
++}
++
++static void
++sync_onig_last_match(mrb_state *mrb, mrb_value md)
++{
++  mrb_sym id_onig = mrb_intern_check_cstr(mrb, "OnigRegexp");
++  if (!id_onig) return;
++  if (!mrb_const_defined_at(mrb, mrb_obj_value(mrb->object_class), id_onig)) return;
++  mrb_value cls = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), id_onig);
++  if (mrb_type(cls) == MRB_TT_CLASS || mrb_type(cls) == MRB_TT_MODULE) {
++    mrb_obj_iv_set_force(mrb, mrb_obj_ptr(cls), mrb_intern_lit(mrb, "@last_match"), md);
++  }
++}
++
++static mrb_value
++backref_tilde_get(mrb_state *mrb)
++{
++  struct mrb_context *cxt;
++  ptrdiff_t ci_idx;
++  struct REnv *env;
++  backref_resolve_scope(mrb, &cxt, &ci_idx, &env);
++  return backref_lookup(mrb, cxt, ci_idx, env);
++}
++
++static void
++backref_tilde_set(mrb_state *mrb, mrb_value v)
++{
++  if (!mrb_nil_p(v) && !match_data_value_p(mrb, v)) {
++    mrb_raisef(mrb, E_TYPE_ERROR, "wrong argument type %T (expected MatchData)", v);
++  }
++  struct mrb_context *cxt;
++  ptrdiff_t ci_idx;
++  struct REnv *env;
++  backref_resolve_scope(mrb, &cxt, &ci_idx, &env);
++  backref_put(mrb, cxt, ci_idx, env, v);
++  sync_onig_last_match(mrb, v);
++}
++
++enum mrb_match_sym_kind {
++  MRB_MSYM_NONE = 0,
++  MRB_MSYM_TILDE,
++  MRB_MSYM_AMP,
++  MRB_MSYM_PRE,
++  MRB_MSYM_POST,
++  MRB_MSYM_PLUS,
++  MRB_MSYM_NTH
++};
++
++static enum mrb_match_sym_kind
++classify_match_sym(mrb_state *mrb, mrb_sym sym, mrb_int *nth_out)
++{
++  mrb_int len = 0;
++  const char *s = mrb_sym_name_len(mrb, sym, &len);
++  if (!s || len < 2 || s[0] != '$') return MRB_MSYM_NONE;
++
++  if (len == 2) {
++    switch (s[1]) {
++    case '~': return MRB_MSYM_TILDE;
++    case '&': return MRB_MSYM_AMP;
++    case '`': return MRB_MSYM_PRE;
++    case '\'': return MRB_MSYM_POST;
++    case '+': return MRB_MSYM_PLUS;
++    default: break;
++    }
++  }
++  if (s[1] >= '1' && s[1] <= '9') {
++    mrb_int n = 0;
++    for (mrb_int i = 1; i < len; i++) {
++      if (s[i] < '0' || s[i] > '9') return MRB_MSYM_NONE;
++      if (n > (MRB_INT_MAX - 9) / 10) return MRB_MSYM_NONE;
++      n = n * 10 + (s[i] - '0');
++    }
++    if (nth_out) *nth_out = n;
++    return MRB_MSYM_NTH;
++  }
++  return MRB_MSYM_NONE;
++}
++
++static mrb_value
++match_sym_derived_get(mrb_state *mrb, enum mrb_match_sym_kind kind, mrb_int nth, mrb_bool *defined_out)
++{
++  if (kind == MRB_MSYM_TILDE) {
++    if (defined_out) *defined_out = TRUE;
++    return backref_tilde_get(mrb);
++  }
++  mrb_value md = backref_tilde_get(mrb);
++  if (mrb_nil_p(md)) {
++    if (defined_out) *defined_out = FALSE;
++    return mrb_nil_value();
++  }
++  switch (kind) {
++  case MRB_MSYM_AMP:
++    if (defined_out) *defined_out = TRUE;
++    return mrb_funcall_id(mrb, md, MRB_OPSYM(aref), 1, mrb_fixnum_value(0));
++  case MRB_MSYM_PRE:
++    if (defined_out) *defined_out = TRUE;
++    return mrb_funcall_id(mrb, md, mrb_intern_lit(mrb, "pre_match"), 0);
++  case MRB_MSYM_POST:
++    if (defined_out) *defined_out = TRUE;
++    return mrb_funcall_id(mrb, md, mrb_intern_lit(mrb, "post_match"), 0);
++  case MRB_MSYM_PLUS:
++    {
++      mrb_value sz_v = mrb_funcall_id(mrb, md, MRB_SYM(size), 0);
++      mrb_int sz = mrb_integer(sz_v);
++      for (mrb_int i = sz - 1; i >= 1; i--) {
++        mrb_value v = mrb_funcall_id(mrb, md, MRB_OPSYM(aref), 1, mrb_fixnum_value(i));
++        if (!mrb_nil_p(v)) {
++          if (defined_out) *defined_out = TRUE;
++          return v;
++        }
++      }
++      if (defined_out) *defined_out = FALSE;
++      return mrb_nil_value();
++    }
++  case MRB_MSYM_NTH:
++    {
++      mrb_value sz_v = mrb_funcall_id(mrb, md, MRB_SYM(size), 0);
++      mrb_int sz = mrb_integer(sz_v);
++      if (nth <= 0 || nth >= sz) {
++        if (defined_out) *defined_out = FALSE;
++        return mrb_nil_value();
++      }
++      mrb_value v = mrb_funcall_id(mrb, md, MRB_OPSYM(aref), 1, mrb_fixnum_value(nth));
++      if (defined_out) *defined_out = !mrb_nil_p(v);
++      return v;
++    }
++  default:
++    if (defined_out) *defined_out = FALSE;
++    return mrb_nil_value();
++  }
++}
++
+ void
+ mrb_gc_mark_gv(mrb_state *mrb)
+ {
+   mark_tbl(mrb, mrb->globals);
++  struct mrb_backref_state *st = backref_state_find(mrb, FALSE);
++  if (st) {
++    size_t i = 0;
++    while (i < st->len) {
++      struct mrb_backref_entry *e = &st->entries[i];
++      if (e->env && mrb_object_dead_p(mrb, (struct RBasic*)e->env)) {
++        st->entries[i] = st->entries[--st->len];
++        continue;
++      }
++      if (e->env) {
++        mrb_gc_mark(mrb, (struct RBasic*)e->env);
++      }
++      mrb_gc_mark_value(mrb, e->match);
++      i++;
++    }
++  }
+ }
+ 
+ void
+@@ -545,6 +933,17 @@ mrb_gc_free_gv(mrb_state *mrb)
+     iv_free(mrb, mrb->globals);
+     mrb->globals = NULL;
+   }
++  struct mrb_backref_state **pp = &mrb_backref_states;
++  while (*pp) {
++    if ((*pp)->mrb == mrb) {
++      struct mrb_backref_state *victim = *pp;
++      *pp = victim->next;
++      mrb_free(mrb, victim->entries);
++      mrb_free(mrb, victim);
++      break;
++    }
++    pp = &(*pp)->next;
++  }
+ }
+ 
+ size_t
+@@ -1266,6 +1665,21 @@ mrb_vm_cv_get(mrb_state *mrb, mrb_sym sym)
+   return mrb_mod_cv_get(mrb, c, sym);
+ }
+ 
++mrb_bool
++mrb_vm_cv_defined_p(mrb_state *mrb, mrb_sym sym)
++{
++  struct RClass *c = NULL;
++  const struct RProc *p = mrb->c->ci->proc;
++
++  while (p) {
++    c = MRB_PROC_TARGET_CLASS(p);
++    if (c && c->tt != MRB_TT_SCLASS) break;
++    p = p->upper;
++  }
++  if (!c) return FALSE;
++  return mrb_mod_cv_defined(mrb, c, sym);
++}
++
+ void
+ mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+ {
+@@ -1405,6 +1819,41 @@ mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
+   return const_get(mrb, c, sym, TRUE);
+ }
+ 
++mrb_bool
++mrb_vm_const_defined_p(mrb_state *mrb, mrb_sym sym)
++{
++  const struct RProc *proc = mrb->c->ci->proc;
++  struct RClass *c = proc ? MRB_PROC_TARGET_CLASS(proc) : NULL;
++  struct RClass *c2;
++
++  if (!c) c = mrb->object_class;
++  if (iv_get(mrb, class_iv_ptr(c), sym, NULL)) {
++    return TRUE;
++  }
++  for (proc = proc ? proc->upper : NULL; proc; proc = proc->upper) {
++    c2 = MRB_PROC_TARGET_CLASS(proc);
++    if (!c2) c2 = mrb->object_class;
++    if (iv_get(mrb, class_iv_ptr(c2), sym, NULL)) {
++      return TRUE;
++    }
++  }
++  if (c->tt == MRB_TT_SCLASS) {
++    if (!mrb_undef_p(const_get_nohook(mrb, c, sym, TRUE))) {
++      return TRUE;
++    }
++
++    mrb_value klass;
++    for (c2 = c; c2 && c2->tt == MRB_TT_SCLASS; c2 = mrb_class_ptr(klass)) {
++      if (!iv_get(mrb, class_iv_ptr(c2), MRB_SYM(__attached__), &klass)) {
++        c2 = NULL;
++        break;
++      }
++    }
++    if (c2 && (c2->tt == MRB_TT_CLASS || c2->tt == MRB_TT_MODULE)) c = c2;
++  }
++  return !mrb_undef_p(const_get_nohook(mrb, c, sym, TRUE));
++}
++
+ /*
+  * Sets a constant in a module or class.
+  *
+@@ -1577,13 +2026,31 @@ mrb_mod_constants(mrb_state *mrb, mrb_value mod)
+ MRB_API mrb_value
+ mrb_gv_get(mrb_state *mrb, mrb_sym sym)
+ {
+-  mrb_value v;
++  mrb_int nth = 0;
++  enum mrb_match_sym_kind kind = classify_match_sym(mrb, sym, &nth);
++  if (kind != MRB_MSYM_NONE) {
++    return match_sym_derived_get(mrb, kind, nth, NULL);
++  }
+ 
++  mrb_value v;
+   if (iv_get(mrb, mrb->globals, sym, &v))
+     return v;
+   return mrb_nil_value();
+ }
+ 
++mrb_bool
++mrb_gv_defined_p(mrb_state *mrb, mrb_sym sym)
++{
++  mrb_int nth = 0;
++  enum mrb_match_sym_kind kind = classify_match_sym(mrb, sym, &nth);
++  if (kind != MRB_MSYM_NONE) {
++    mrb_bool def = FALSE;
++    match_sym_derived_get(mrb, kind, nth, &def);
++    return def;
++  }
++  return iv_get(mrb, mrb->globals, sym, NULL) != 0;
++}
++
+ /*
+  * Sets a global variable.
+  *
+@@ -1597,6 +2064,18 @@ mrb_gv_get(mrb_state *mrb, mrb_sym sym)
+ MRB_API void
+ mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+ {
++  mrb_int nth = 0;
++  enum mrb_match_sym_kind kind = classify_match_sym(mrb, sym, &nth);
++  if (kind == MRB_MSYM_TILDE) {
++    backref_tilde_set(mrb, v);
++    return;
++  }
++  if (kind != MRB_MSYM_NONE) {
++    /* $&, $`, $', $+, $1..$N are dynamically derived from lexical $~;
++       ignore legacy flat-global writes from C regexp extensions. */
++    return;
++  }
++
+   iv_tbl *t;
+ 
+   if (!mrb->globals) {
+@@ -1616,6 +2095,15 @@ mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+ MRB_API void
+ mrb_gv_remove(mrb_state *mrb, mrb_sym sym)
+ {
++  mrb_int nth = 0;
++  enum mrb_match_sym_kind kind = classify_match_sym(mrb, sym, &nth);
++  if (kind == MRB_MSYM_TILDE) {
++    backref_tilde_set(mrb, mrb_nil_value());
++    return;
++  }
++  if (kind != MRB_MSYM_NONE) {
++    return;
++  }
+   iv_del(mrb, mrb->globals, sym, NULL);
+ }
+ 
+diff --git a/src/vm.c b/src/vm.c
+index 96d9266d8..a47528345 100644
+--- a/src/vm.c
++++ b/src/vm.c
+@@ -403,6 +403,7 @@ fiber_terminate(mrb_state *mrb, struct mrb_context *c, mrb_callinfo *ci)
+   struct REnv *env = CI_ENV(ci);
+   mrb_assert(env == NULL || MRB_ENV_LEN(env) <= c->stend - ci->stack);
+ 
++  mrb_backref_context_free(mrb, c);
+   c->status = MRB_FIBER_TERMINATED;
+   mrb_free(mrb, c->cibase);
+   c->cibase = c->ciend = c->ci = NULL;
+@@ -492,6 +493,7 @@ cipop(mrb_state *mrb)
+   mrb_callinfo *ci = c->ci;
+   struct REnv *env = CI_ENV(ci);
+ 
++  mrb_backref_frame_pop(mrb, c, ci);
+   ci_env_set(ci, NULL); // make possible to free env by GC if not needed
+   struct RProc *b = ci->blk;
+   if (b && !MRB_PROC_STRICT_P(b) && MRB_PROC_ENV(b) == CI_ENV(&ci[-1])) {
+@@ -3594,6 +3596,198 @@ RETRY_TRY_BLOCK:
+       NEXT;
+     }
+ 
++    CASE(OP_DEFINED, BBB) {
++      mrb_sym sym = ((enum mrb_defined_type)c == MRB_DEFINED_YIELD ||
++                     (enum mrb_defined_type)c == MRB_DEFINED_SUPER) ? 0 : irep->syms[b];
++      mrb_value res = mrb_nil_value();
++
++      switch ((enum mrb_defined_type)c) {
++      case MRB_DEFINED_CONST:
++        if (mrb_vm_const_defined_p(mrb, sym)) {
++          res = mrb_str_new_lit(mrb, "constant");
++        }
++        break;
++      case MRB_DEFINED_MCONST:
++        switch (mrb_type(regs[a])) {
++        case MRB_TT_CLASS:
++        case MRB_TT_MODULE:
++        case MRB_TT_SCLASS:
++          if (mrb_const_defined_at(mrb, regs[a], sym)) {
++            res = mrb_str_new_lit(mrb, "constant");
++          }
++          break;
++        default:
++          break;
++        }
++        break;
++      case MRB_DEFINED_GVAR:
++        if (mrb_gv_defined_p(mrb, sym)) {
++          res = mrb_str_new_lit(mrb, "global-variable");
++        }
++        break;
++      case MRB_DEFINED_IVAR:
++        if (mrb_iv_defined(mrb, regs[0], sym)) {
++          res = mrb_str_new_lit(mrb, "instance-variable");
++        }
++        break;
++      case MRB_DEFINED_CVAR:
++        if (mrb_vm_cv_defined_p(mrb, sym)) {
++          res = mrb_str_new_lit(mrb, "class variable");
++        }
++        break;
++      case MRB_DEFINED_FCALL:
++        {
++          struct RClass *klass = mrb_class(mrb, regs[0]);
++          struct RClass *def_class = klass;
++          mrb_method_t m = mrb_vm_find_method(mrb, klass, &def_class, sym);
++          if (!MRB_METHOD_UNDEF_P(m)) {
++            res = mrb_str_new_lit(mrb, "method");
++          }
++        }
++        break;
++      case MRB_DEFINED_CALL:
++        {
++          mrb_value recv = regs[a];
++          struct RClass *klass = mrb_class(mrb, recv);
++          struct RClass *def_class = klass;
++          mrb_method_t m = mrb_vm_find_method(mrb, klass, &def_class, sym);
++          if (!MRB_METHOD_UNDEF_P(m)) {
++            if (m.flags & MRB_METHOD_PRIVATE_FL) {
++              break;
++            }
++            if ((m.flags & MRB_METHOD_PROTECTED_FL) && !mrb_obj_is_kind_of(mrb, regs[0], def_class)) {
++              break;
++            }
++            res = mrb_str_new_lit(mrb, "method");
++          }
++          else if (mrb_respond_to_missing_p(mrb, recv, sym, FALSE)) {
++            res = mrb_str_new_lit(mrb, "method");
++          }
++        }
++        break;
++      case MRB_DEFINED_YIELD:
++        {
++          const struct RProc *p = ci->proc;
++          mrb_callinfo *method_ci = NULL;
++          struct REnv *env = NULL;
++
++          if (p && !MRB_PROC_CFUNC_P(p)) {
++            if (MRB_PROC_SCOPE_P(p) && !MRB_PROC_ENV_P(p)) {
++              /* Regular `def` method frame (both SCOPE and STRICT, without closure env):
++                 check frame block. `define_method` sets SCOPE via mrb_define_method_raw
++                 while keeping ENVSET from its defining block, so it takes the lexical branch. */
++              if (MRB_PROC_STRICT_P(p) && ci > mrb->c->cibase && ci->mid != 0) {
++                method_ci = ci;
++              }
++            }
++            else {
++              /* Block, proc, eval, or define_method closure: walk lexical upper chain
++                 to the enclosing `def` method scope (which has SCOPE + STRICT and !ENVSET) */
++              while (p) {
++                if (MRB_PROC_SCOPE_P(p) && !MRB_PROC_ENV_P(p)) break;
++                if (MRB_PROC_ENV_P(p)) env = MRB_PROC_ENV(p);
++                p = p->upper;
++              }
++              if (p && MRB_PROC_STRICT_P(p) && env) {
++                if (env->cxt == mrb->c) {
++                  for (method_ci = ci; method_ci > mrb->c->cibase; method_ci--) {
++                    if (method_ci->proc == p) break;
++                  }
++                  if (method_ci == mrb->c->cibase || method_ci->mid == 0) method_ci = NULL;
++                }
++                else if (env->mid != 0) {
++                  mrb_int bidx = MRB_ENV_BIDX(env);
++                  if (bidx > 0 && bidx < MRB_ENV_LEN(env) && !mrb_nil_p(env->stack[bidx])) {
++                    res = mrb_str_new_lit(mrb, "yield");
++                  }
++                }
++              }
++            }
++            if (method_ci) {
++              mrb_value blk = method_ci->stack[ci_bidx(method_ci)];
++              if (!mrb_nil_p(blk)) {
++                res = mrb_str_new_lit(mrb, "yield");
++              }
++            }
++          }
++        }
++        break;
++      case MRB_DEFINED_SUPER:
++        {
++          const struct RProc *p = ci->proc;
++          mrb_sym mid = 0;
++          struct RClass *target_class = NULL;
++
++          if (p && !MRB_PROC_CFUNC_P(p)) {
++            if (MRB_PROC_SCOPE_P(p)) {
++              /* Direct `def` method (!ENVSET) or `define_method` invocation (ENVSET + STRICT):
++                 require STRICT so class/module/top scopes (SCOPE without STRICT) stay nil. */
++              if (MRB_PROC_STRICT_P(p) && ci > mrb->c->cibase && ci->mid != 0) {
++                mid = ci->mid;
++                target_class = CI_TARGET_CLASS(ci);
++              }
++            }
++            else {
++              /* Block, proc, or eval string: resolve mid and target_class from
++                 the lexical environment up to the enclosing `def` or `define_method` scope */
++              while (p) {
++                if (MRB_PROC_ENV_P(p)) {
++                  struct REnv *e = MRB_PROC_ENV(p);
++                  if (mid == 0 && e->mid != 0) mid = e->mid;
++                  if (!target_class && e->c) target_class = e->c;
++                }
++                if (MRB_PROC_SCOPE_P(p)) break;
++                p = p->upper;
++              }
++              if (p && MRB_PROC_ENV_P(p) && MRB_PROC_STRICT_P(p) && mid == 0) {
++                /* Enclosing scope is an active `define_method` frame on the call stack */
++                mrb_callinfo *dm_ci;
++                for (dm_ci = ci; dm_ci > mrb->c->cibase; dm_ci--) {
++                  if (dm_ci->proc == p && dm_ci->mid != 0) {
++                    mid = dm_ci->mid;
++                    target_class = CI_TARGET_CLASS(dm_ci);
++                    break;
++                  }
++                }
++              }
++            }
++          }
++
++          if (mid != 0 && target_class) {
++            struct RClass *c = NULL;
++            if (target_class->tt == MRB_TT_ICLASS || target_class->tt == MRB_TT_MODULE) {
++              struct RClass *mod = target_class;
++              struct RClass *cl = mrb_class(mrb, regs[0]);
++              MRB_CLASS_ORIGIN(mod);
++              while (cl) {
++                if ((cl->tt == MRB_TT_ICLASS || cl->tt == MRB_TT_MODULE) && cl->mt == mod->mt) {
++                  c = cl->super;
++                  break;
++                }
++                cl = cl->super;
++              }
++            }
++            else {
++              c = target_class->super;
++            }
++            if (c) {
++              mrb_method_t m = mrb_vm_find_method(mrb, c, &c, mid);
++              if (!MRB_METHOD_UNDEF_P(m)) {
++                res = mrb_str_new_lit(mrb, "super");
++              }
++            }
++          }
++        }
++        break;
++      default:
++        break;
++      }
++      ci = mrb->c->ci;
++      regs[a] = res;
++      mrb_gc_arena_shrink(mrb, ai);
++      NEXT;
++    }
++
+     CASE(OP_DEBUG, BBB) {
+ #ifdef MRB_USE_DEBUG_HOOK
+       if (mrb->debug_op_hook) mrb->debug_op_hook(mrb, irep, ci->pc, regs);

@@ -40,6 +40,9 @@ public class TilemapData : RubyData
     public int CachedAnimFrameC = -1;
     public int CachedFlashAlpha = -1;
     public ulong CachedMapDataId;
+    public ulong CachedMapRevision;
+    public ulong CachedFlagsRevision;
+    public ulong CachedFlashRevision;
     public bool LayersDirty = true;       // force first composite
 
     public TilemapData(RbState state) : base(state)

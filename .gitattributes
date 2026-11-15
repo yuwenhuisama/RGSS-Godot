@@ -1,0 +1,6 @@
+# Exact original-runtime evidence, third-party sources and generated patches.
+tests/fixtures/*_original.tsv -text -whitespace
+tests/fixtures/third_party/*.rb -text -whitespace
+tools/defined-compiler/*.patch -text -whitespace
+tools/defined-compiler/*_original.tsv -text -whitespace
+Plugins/*/audio/BUILD.txt -text -whitespace

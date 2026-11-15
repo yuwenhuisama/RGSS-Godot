@@ -1,0 +1,11 @@
+frame_reset	123
+wait	0	0
+wait	1	1
+wait	4	4
+wait	-1	0
+fadeout	0	0	0
+fadein	0	0	255
+fadeout	1	1	0
+fadein	1	1	255
+fadeout	4	4	0
+fadein	4	4	255

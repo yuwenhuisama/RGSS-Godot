@@ -1,3 +1,9 @@
+class File
+  def self.symlink?(path)
+    Unity.file_symlink?(path)
+  end
+end
+
 class Dir
 
   def self.glob(pattern, flags=0, &block)

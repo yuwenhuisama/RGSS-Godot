@@ -5,10 +5,12 @@ instance uniform vec4 _PackedA = vec4(0.0, 72.0, 720.0, 1.0);
 instance uniform vec4 _PackedB = vec4(0.0, 0.0, 0.0, 0.0);
 instance uniform vec4 _PackedC = vec4(1.0, 1.0, 1.0, 0.0);
 instance uniform vec4 _PackedD = vec4(1.0, 0.0, 0.0, 0.0);
+instance uniform bool compose_background = true;
 
 uniform vec4 mix_color = vec4(0.0, 0.0, 0.0, 0.0);
-uniform float bush_depth = 0.0;
+uniform float bush_depth = 1.0;
 uniform vec2 texture_size = vec2(1.0, 1.0);
+uniform sampler2D background_texture : hint_screen_texture, filter_nearest;
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 const float RGSS_PI = 3.14159265358979323846;
@@ -30,6 +32,9 @@ vec2 wave_uv(vec2 uv) {
 
 void fragment() {
     vec2 uv = UV;
+    if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) {
+        discard;
+    }
 
     // Unity order: mirror -> wave -> gray -> tone -> opacity -> color -> bush -> flash.
     uv.x = mix(uv.x, 1.0 - uv.x, step(0.5, _PackedD.y));
@@ -40,17 +45,28 @@ void fragment() {
     vec4 waved_col = waved_uv.x < 0.0 ? vec4(0.0) : texture(TEXTURE, waved_uv);
     col = mix(col, waved_col, use_wave);
 
-    float luma = dot(col.rgb, LUMA);
-    col.rgb = mix(col.rgb, vec3(luma), _PackedB.w);
+    vec3 bytes = round(col.rgb * 255.0);
+    float luma = floor(dot(bytes, vec3(77.0, 150.0, 29.0)) / 256.0);
+    float gray_alpha = _PackedB.w > 0.0 ? (trunc(_PackedB.w * 255.0) + 1.0) / 256.0 : 0.0;
+    col.rgb = floor(mix(bytes, vec3(luma), gray_alpha)) / 255.0;
 
-    col.rgb += _PackedB.rgb;
+    col.rgb += trunc(_PackedB.rgb * 255.0) / 255.0;
     col.a *= _PackedD.x;
 
-    col.rgb = mix(col.rgb, mix_color.rgb, mix_color.a);
+    float color_alpha = mix_color.a > 0.0 ? (floor(mix_color.a * 255.0) + 1.0) / 256.0 : 0.0;
+    col.rgb = floor(mix(round(col.rgb * 255.0), round(mix_color.rgb * 255.0), color_alpha)) / 255.0;
 
-    float under_bush = step(uv.y, bush_depth);
+    float under_bush = step(bush_depth, uv.y);
     col.a *= mix(1.0, _PackedA.w, under_bush);
 
-    col.rgba = mix(col.rgba, _PackedC.rgba, _PackedC.w);
+    float flash_alpha = _PackedC.w > 0.0 ? (floor(_PackedC.w * 255.0) + 1.0) / 256.0 : 0.0;
+    col.rgb = floor(mix(round(col.rgb * 255.0), round(_PackedC.rgb * 255.0), flash_alpha)) / 255.0;
+    if (compose_background && col.a > 0.0 && col.a < 1.0) {
+        vec4 background = texture(background_texture, SCREEN_UV);
+        float alpha = (floor(col.a * 255.0) + 1.0) / 256.0;
+        float result_alpha = alpha + background.a * (1.0 - alpha);
+        col.rgb = floor(((col.rgb * alpha + background.rgb * (1.0 - alpha)) / result_alpha) * 255.0) / 255.0;
+        col.a = result_alpha;
+    }
     COLOR = col;
 }

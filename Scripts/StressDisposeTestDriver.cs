@@ -23,6 +23,8 @@ public partial class StressDisposeTestDriver : RefCounted
         GlobalConfig.Initialize();
         RMProjectPath.Initialize();
         GameRenderManager.Instance.Initialize(parent);
+        InputStateRecorder.Instance.Init();
+        GameInputManager.RegisterActions();
         RubyScriptManager.Instance.Initialize();
         this.initialized = true;
     }
@@ -48,9 +50,21 @@ public partial class StressDisposeTestDriver : RefCounted
     public long GetManagedMemory()
         => GC.GetTotalMemory(false);
 
+    public int GetPendingBitmapCount()
+        => GameRenderManager.DirtyBitmapDataSet.Count;
+
+    public bool HasUpdateFiber()
+        => RGSSUnity.RubyClasses.UnityModule.UpdateFiber is not null;
+
+    public bool HasMidiPlayback()
+        => GameMidiPlayer.Playing;
+
+    public int GetLiveBitmapCount()
+        => RGSSUnity.RubyClasses.BitmapData.LiveResourceCount;
+
     public void CollectGarbage()
     {
-        const string script = "GC.start if defined?(GC) && GC.respond_to?(:start)";
+        const string script = "GC.start if GC.respond_to?(:start)";
         _ = RubyScriptManager.Instance.LoadScriptContentWithFileName("stress_dispose_gc", script, out _);
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -63,6 +77,7 @@ public partial class StressDisposeTestDriver : RefCounted
             return;
 
         GameRenderManager.Instance.Dispose();
+        GameMidiPlayer.Close();
         RubyScriptManager.Instance.Destroy();
         this.initialized = false;
     }

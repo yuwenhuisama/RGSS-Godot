@@ -1,0 +1,6 @@
+crc	close	Zlib::GzipFile::CRCError
+length	close	Zlib::GzipFile::LengthError
+no-footer	close	Zlib::GzipFile::NoFooter
+short-body	read	Zlib::GzipFile::Error
+trailing	accepted	696e74656772697479207061796c6f6164	-
+early-close	accepted	69	-

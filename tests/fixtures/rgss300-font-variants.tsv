@@ -1,0 +1,220 @@
+Arial	12	Hello AV	false	36	12
+Arial	12	Hello AV	true	42	12
+Arial	12	中文测试	false	40	12
+Arial	12	中文测试	true	44	12
+Arial	12	Hello中文123	false	56	12
+Arial	12	Hello中文123	true	65	12
+Arial	12	A V	false	15	12
+Arial	12	A V	true	17	12
+Arial	12		false	0	0
+Arial	12		true	0	0
+Arial	12	123	false	15	12
+Arial	12	123	true	18	12
+Arial	12	A	false	6	12
+Arial	12	A	true	7	12
+Arial	12	V	false	7	12
+Arial	12	V	true	7	12
+Arial	12	AV	false	12	12
+Arial	12	AV	true	14	12
+Arial	12	Hello	false	21	12
+Arial	12	Hello	true	25	12
+Arial	12	 	false	3	12
+Arial	12	 	true	3	12
+Arial	18	Hello AV	false	61	18
+Arial	18	Hello AV	true	59	18
+Arial	18	中文测试	false	64	18
+Arial	18	中文测试	true	68	18
+Arial	18	Hello中文123	false	94	18
+Arial	18	Hello中文123	true	95	18
+Arial	18	A V	false	26	18
+Arial	18	A V	true	23	18
+Arial	18		false	0	0
+Arial	18		true	0	0
+Arial	18	123	false	27	18
+Arial	18	123	true	24	18
+Arial	18	A	false	11	18
+Arial	18	A	true	10	18
+Arial	18	V	false	11	18
+Arial	18	V	true	9	18
+Arial	18	AV	false	22	18
+Arial	18	AV	true	19	18
+Arial	18	Hello	false	35	18
+Arial	18	Hello	true	37	18
+Arial	18	 	false	4	18
+Arial	18	 	true	4	18
+Arial	24	Hello AV	false	78	24
+Arial	24	Hello AV	true	79	24
+Arial	24	中文测试	false	88	24
+Arial	24	中文测试	true	84	24
+Arial	24	Hello中文123	false	126	24
+Arial	24	Hello中文123	true	122	24
+Arial	24	A V	false	33	24
+Arial	24	A V	true	32	24
+Arial	24		false	0	0
+Arial	24		true	0	0
+Arial	24	123	false	36	24
+Arial	24	123	true	33	24
+Arial	24	A	false	14	24
+Arial	24	A	true	13	24
+Arial	24	V	false	13	24
+Arial	24	V	true	13	24
+Arial	24	AV	false	27	24
+Arial	24	AV	true	26	24
+Arial	24	Hello	false	46	24
+Arial	24	Hello	true	47	24
+Arial	24	 	false	6	24
+Arial	24	 	true	6	24
+Arial	32	Hello AV	false	104	32
+Arial	32	Hello AV	true	113	32
+Arial	32	中文测试	false	112	32
+Arial	32	中文测试	true	116	32
+Arial	32	Hello中文123	false	162	32
+Arial	32	Hello中文123	true	171	32
+Arial	32	A V	false	44	32
+Arial	32	A V	true	45	32
+Arial	32		false	0	0
+Arial	32		true	0	0
+Arial	32	123	false	45	32
+Arial	32	123	true	45	32
+Arial	32	A	false	19	32
+Arial	32	A	true	19	32
+Arial	32	V	false	18	32
+Arial	32	V	true	18	32
+Arial	32	AV	false	36	32
+Arial	32	AV	true	37	32
+Arial	32	Hello	false	61	32
+Arial	32	Hello	true	68	32
+Arial	32	 	false	8	32
+Arial	32	 	true	8	32
+Arial	48	Hello AV	false	164	47
+Arial	48	Hello AV	true	165	47
+Arial	48	中文测试	false	168	47
+Arial	48	中文测试	true	172	47
+Arial	48	Hello中文123	false	249	47
+Arial	48	Hello中文123	true	255	47
+Arial	48	A V	false	69	47
+Arial	48	A V	true	65	47
+Arial	48		false	0	0
+Arial	48		true	0	0
+Arial	48	123	false	69	47
+Arial	48	123	true	69	47
+Arial	48	A	false	29	47
+Arial	48	A	true	27	47
+Arial	48	V	false	28	47
+Arial	48	V	true	27	47
+Arial	48	AV	false	57	47
+Arial	48	AV	true	54	47
+Arial	48	Hello	false	96	47
+Arial	48	Hello	true	100	47
+Arial	48	 	false	12	47
+Arial	48	 	true	11	47
+nsimsun	12	Hello AV	false	48	12
+nsimsun	12	Hello AV	true	56	12
+nsimsun	12	中文测试	false	48	12
+nsimsun	12	中文测试	true	52	12
+nsimsun	12	Hello中文123	false	72	12
+nsimsun	12	Hello中文123	true	82	12
+nsimsun	12	A V	false	18	12
+nsimsun	12	A V	true	21	12
+nsimsun	12		false	0	0
+nsimsun	12		true	0	0
+nsimsun	12	123	false	18	12
+nsimsun	12	123	true	21	12
+nsimsun	12	A	false	6	12
+nsimsun	12	A	true	7	12
+nsimsun	12	V	false	6	12
+nsimsun	12	V	true	7	12
+nsimsun	12	AV	false	12	12
+nsimsun	12	AV	true	14	12
+nsimsun	12	Hello	false	30	12
+nsimsun	12	Hello	true	35	12
+nsimsun	12	 	false	6	12
+nsimsun	12	 	true	7	12
+nsimsun	18	Hello AV	false	72	18
+nsimsun	18	Hello AV	true	80	18
+nsimsun	18	中文测试	false	72	18
+nsimsun	18	中文测试	true	76	18
+nsimsun	18	Hello中文123	false	108	18
+nsimsun	18	Hello中文123	true	118	18
+nsimsun	18	A V	false	27	18
+nsimsun	18	A V	true	30	18
+nsimsun	18		false	0	0
+nsimsun	18		true	0	0
+nsimsun	18	123	false	27	18
+nsimsun	18	123	true	30	18
+nsimsun	18	A	false	9	18
+nsimsun	18	A	true	10	18
+nsimsun	18	V	false	9	18
+nsimsun	18	V	true	10	18
+nsimsun	18	AV	false	18	18
+nsimsun	18	AV	true	20	18
+nsimsun	18	Hello	false	45	18
+nsimsun	18	Hello	true	50	18
+nsimsun	18	 	false	9	18
+nsimsun	18	 	true	10	18
+nsimsun	24	Hello AV	false	96	24
+nsimsun	24	Hello AV	true	104	24
+nsimsun	24	中文测试	false	96	24
+nsimsun	24	中文测试	true	100	24
+nsimsun	24	Hello中文123	false	144	24
+nsimsun	24	Hello中文123	true	154	24
+nsimsun	24	A V	false	36	24
+nsimsun	24	A V	true	39	24
+nsimsun	24		false	0	0
+nsimsun	24		true	0	0
+nsimsun	24	123	false	36	24
+nsimsun	24	123	true	39	24
+nsimsun	24	A	false	12	24
+nsimsun	24	A	true	13	24
+nsimsun	24	V	false	12	24
+nsimsun	24	V	true	13	24
+nsimsun	24	AV	false	24	24
+nsimsun	24	AV	true	26	24
+nsimsun	24	Hello	false	60	24
+nsimsun	24	Hello	true	65	24
+nsimsun	24	 	false	12	24
+nsimsun	24	 	true	13	24
+nsimsun	32	Hello AV	false	128	33
+nsimsun	32	Hello AV	true	136	33
+nsimsun	32	中文测试	false	128	33
+nsimsun	32	中文测试	true	132	33
+nsimsun	32	Hello中文123	false	192	33
+nsimsun	32	Hello中文123	true	202	33
+nsimsun	32	A V	false	48	33
+nsimsun	32	A V	true	51	33
+nsimsun	32		false	0	0
+nsimsun	32		true	0	0
+nsimsun	32	123	false	48	33
+nsimsun	32	123	true	51	33
+nsimsun	32	A	false	16	33
+nsimsun	32	A	true	17	33
+nsimsun	32	V	false	16	33
+nsimsun	32	V	true	17	33
+nsimsun	32	AV	false	32	33
+nsimsun	32	AV	true	34	33
+nsimsun	32	Hello	false	80	33
+nsimsun	32	Hello	true	85	33
+nsimsun	32	 	false	16	33
+nsimsun	32	 	true	17	33
+nsimsun	48	Hello AV	false	192	48
+nsimsun	48	Hello AV	true	200	48
+nsimsun	48	中文测试	false	192	48
+nsimsun	48	中文测试	true	196	48
+nsimsun	48	Hello中文123	false	288	48
+nsimsun	48	Hello中文123	true	298	48
+nsimsun	48	A V	false	72	48
+nsimsun	48	A V	true	75	48
+nsimsun	48		false	0	0
+nsimsun	48		true	0	0
+nsimsun	48	123	false	72	48
+nsimsun	48	123	true	75	48
+nsimsun	48	A	false	24	48
+nsimsun	48	A	true	25	48
+nsimsun	48	V	false	24	48
+nsimsun	48	V	true	25	48
+nsimsun	48	AV	false	48	48
+nsimsun	48	AV	true	50	48
+nsimsun	48	Hello	false	120	48
+nsimsun	48	Hello	true	125	48
+nsimsun	48	 	false	24	48
+nsimsun	48	 	true	25	48

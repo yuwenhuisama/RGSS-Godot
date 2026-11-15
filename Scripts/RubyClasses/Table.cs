@@ -11,6 +11,7 @@ namespace RGSSUnity.RubyClasses
         public int YSize;
         public int ZSize;
         public int[] Data = Array.Empty<int>();
+        public ulong Revision;
 
         public TableData(RbState state) : base(state)
         {
@@ -66,21 +67,46 @@ namespace RGSSUnity.RubyClasses
             }
 
             var tableData = self.GetRDataObject<TableData>();
-            var newSize = xSize;
-            if (ySize != 0)
+            var oldData = tableData.Data;
+            var oldXSize = tableData.XSize;
+            var oldYSize = tableData.YSize;
+            var oldZSize = tableData.ZSize;
+
+            var newSize = xSize * ySize * zSize;
+
+            // RGSS3 resize preserves values by (x, y, z) coordinate, not by flat
+            // index: growing/shrinking one axis must not shift the others. Copy the
+            // overlapping box row by row, using each table's own strides.
+            var newData = new int[newSize];
+            var copyX = Math.Min(oldXSize, xSize);
+            var copyY = Math.Min(oldYSize, ySize);
+            var copyZ = Math.Min(oldZSize, zSize);
+            if (copyX > 0)
             {
-                newSize *= ySize;
-                if (zSize != 0)
+                var oldRowStride = oldXSize;
+                var oldLayerStride = oldXSize * oldYSize;
+                var newRowStride = xSize;
+                var newLayerStride = xSize * ySize;
+                for (var z = 0; z < copyZ; z++)
                 {
-                    newSize *= zSize;
+                    for (var y = 0; y < copyY; y++)
+                    {
+                        var src = z * oldLayerStride + y * oldRowStride;
+                        var dst = z * newLayerStride + y * newRowStride;
+                        var count = Math.Min(copyX, Math.Min(oldData.Length - src, newData.Length - dst));
+                        if (count > 0)
+                        {
+                            Array.Copy(oldData, src, newData, dst, count);
+                        }
+                    }
                 }
             }
 
             tableData.XSize = xSize;
             tableData.YSize = ySize;
             tableData.ZSize = zSize;
-
-            Array.Resize(ref tableData.Data, (int)newSize);
+            tableData.Data = newData;
+            tableData.Revision++;
             return state.RbNil;
         }
 
@@ -152,6 +178,7 @@ namespace RGSSUnity.RubyClasses
                 return state.RbNil;
             }
             tableData.Data[unboxedX] = (short)(long)value.ToIntUnchecked();
+            tableData.Revision++;
             return state.RbNil;
         }
 
@@ -170,6 +197,7 @@ namespace RGSSUnity.RubyClasses
             }
             var index = unboxedX + unboxedY * tableData.XSize;
             tableData.Data[index] = (short)(long)value.ToIntUnchecked();
+            tableData.Revision++;
             return state.RbNil;
         }
 
@@ -190,20 +218,13 @@ namespace RGSSUnity.RubyClasses
             }
             var index = unboxedX + unboxedY * tableData.XSize + unboxedZ * tableData.XSize * tableData.YSize;
             tableData.Data[index] = (short)(long)value.ToIntUnchecked();
+            tableData.Revision++;
             return state.RbNil;
         }
 
         private static TableData CreateTableData(RbState state, int xSize, int ySize, int zSize)
         {
-            var size = xSize;
-            if (ySize != 0)
-            {
-                size *= ySize;
-                if (zSize != 0)
-                {
-                    size *= zSize;
-                }
-            }
+            var size = xSize * ySize * zSize;
 
             var tableData = new TableData(state)
             {

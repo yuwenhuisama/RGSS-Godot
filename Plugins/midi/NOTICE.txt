@@ -1,0 +1,21 @@
+Software MIDI uses MeltySynth 2.4.1 (MIT) and the unmodified TimGM6mb.sf2
+General MIDI sound bank (GPL-2.0). Their separate license texts and copyrights
+are included in this directory. The SoundFont is distributed as a separate
+data asset, not relicensed under the host's license.
+
+MeltySynth: https://github.com/sinshu/meltysynth
+NuGet 2.4.1 SHA256:
+c88ef3f36bbabd7f0bf63d2223712208080ef962b1604d080d1be385ccabee90
+
+TimGM6mb source archive:
+https://deb.debian.org/debian/pool/main/t/timgm6mb-soundfont/timgm6mb-soundfont_1.3.orig.tar.gz
+Archive SHA256:
+af8f3a00e416dfb262bcaa904a1c84df04a51b72bbc1313aed012bc754bdf99b
+TimGM6mb.sf2 SHA256:
+c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854
+
+The original source archive and editable SoundFont are included. Copyright
+2004 Tim Brechbill and 2010 David Bolton. See TimGM6mb-COPYRIGHT.txt and
+GPL-2.0.txt for terms. The bank contains all 128 GM melodic programs and
+eight drum kits. A different bank does not reproduce Windows Mapper timbres
+byte-for-byte; software MIDI acceptance covers measured playback behavior.

@@ -20,14 +20,14 @@ namespace RGSSUnity
             (InputStateRecorder.InputKey.LEFT,  "rgss_left",  Key.Left),
             (InputStateRecorder.InputKey.RIGHT, "rgss_right", Key.Right),
             (InputStateRecorder.InputKey.UP,    "rgss_up",    Key.Up),
-            (InputStateRecorder.InputKey.A,     "rgss_a",     Key.X),
+            (InputStateRecorder.InputKey.A,     "rgss_a",     Key.Shift),
             (InputStateRecorder.InputKey.B,     "rgss_b",     Key.X),      // escape also added in RegisterInputActions
             (InputStateRecorder.InputKey.C,     "rgss_c",     Key.Z),
             (InputStateRecorder.InputKey.X,     "rgss_x",     Key.A),
             (InputStateRecorder.InputKey.Y,     "rgss_y",     Key.S),
-            (InputStateRecorder.InputKey.Z,     "rgss_z",     Key.C),
-            (InputStateRecorder.InputKey.L,     "rgss_l",     Key.L),
-            (InputStateRecorder.InputKey.R,     "rgss_r",     Key.R),
+            (InputStateRecorder.InputKey.Z,     "rgss_z",     Key.D),
+            (InputStateRecorder.InputKey.L,     "rgss_l",     Key.Q),
+            (InputStateRecorder.InputKey.R,     "rgss_r",     Key.W),
             (InputStateRecorder.InputKey.SHIFT, "rgss_shift", Key.Shift),
             (InputStateRecorder.InputKey.CTRL,  "rgss_ctrl",  Key.Ctrl),
             (InputStateRecorder.InputKey.ALT,   "rgss_alt",   Key.Alt),
@@ -37,5 +37,22 @@ namespace RGSSUnity
             (InputStateRecorder.InputKey.F8,    "rgss_f8",    Key.F8),
             (InputStateRecorder.InputKey.F9,    "rgss_f9",    Key.F9),
         };
+
+        internal static void RegisterActions()
+        {
+            foreach (var (_, action, keycode) in ActionTable)
+            {
+                if (!InputMap.HasAction(action))
+                    InputMap.AddAction(action);
+                InputMap.ActionEraseEvents(action);
+                InputMap.ActionAddEvent(action, new InputEventKey { Keycode = keycode });
+            }
+            InputMap.ActionAddEvent("rgss_b", new InputEventKey { Keycode = Key.Escape });
+            InputMap.ActionAddEvent("rgss_b", new InputEventKey { Keycode = Key.Kp0 });
+            InputMap.ActionAddEvent("rgss_c", new InputEventKey { Keycode = Key.Enter });
+            InputMap.ActionAddEvent("rgss_c", new InputEventKey { Keycode = Key.Space });
+            InputMap.ActionAddEvent("rgss_l", new InputEventKey { Keycode = Key.Pageup });
+            InputMap.ActionAddEvent("rgss_r", new InputEventKey { Keycode = Key.Pagedown });
+        }
     }
 }

@@ -1,29 +1,45 @@
-# mruby-ext — NATIVE mruby GEM BUILD
+# NATIVE MRUBY GEM BUILD
 
-xmake build for the 4 native mruby gems P/Invoked by `RubyScriptManager.cs`. Output DLLs are copied to `Assets/Plugins/windows/`. Touch this ONLY when changing native gem behavior — normal engine work never builds here.
+## OVERVIEW
+Four xmake extension targets sharing the host mruby ABI; score 1 excluding vendored sources, retained because existing native-domain guidance needs correction.
 
-## THE 4 GEMS → DLLs
-| Dir | Gem (git submodule) | Produces | P/Invoke entry |
-|-----|--------------------|----------|----------------|
-| `marshal/` | mruby-marshal-c | `libmruby_marshal_c_ext_x64.dll` | `mrb_mruby_marshal_c_gem_init` |
-| `glob/` | mruby-dir-glob | `libmruby_dir_glob_ext_x64.dll` | `mrb_mruby_dir_glob_gem_init` |
-| `regexp/` | mruby-onig-regexp | `libmruby_onig_regexp_ext_x64.dll` | `mrb_mruby_onig_regexp_gem_init` |
-| `zlib/` | mruby-zlib (+ zlib-1.3.1) | `libmruby_zlib_ext_x64.dll` | `mrb_mruby_zlib_gem_init` |
+## WHERE TO LOOK
+| Directory | Windows DLL | Init export |
+|-----------|-------------|-------------|
+| `marshal/` | `libmruby_marshal_c_ext_x64.dll` | `mrb_mruby_marshal_c_gem_init` |
+| `glob/` | `libmruby_dir_glob_ext_x64.dll` | `mrb_mruby_dir_glob_gem_init` |
+| `regexp/` | `libmruby_onig_regexp_ext_x64.dll` | `mrb_mruby_onig_regexp_gem_init` |
+| `zlib/` | `libmruby_zlib_ext_x64.dll` | `mrb_mruby_zlib_gem_init` |
 
-Submodules in `.gitmodules`; `git submodule update --init` before first build.
+## CONVENTIONS
+- Root `xmake.lua` includes the four gem directories; each owns an `xmake.lua` and Windows `export.def`.
+- Submodule paths and fork branches live in root `.gitmodules`; initialize them before a native build.
+- Each target uses `MRUBY_DIR` when set, otherwise `E:/Projects/mruby-for-dotnet/mruby`.
+- Headers come from that checkout's `build/host/include`; an override changes the header source, not prebuilt import libraries.
+- `MRB_INT64` and `MRB_UTF8_STRING` must match the host build and the managed MRuby.Library ABI.
+- The current bundled Windows host also enables `MRB_USE_DEBUG_HOOK`; all four Windows extension targets must use it. `tools/run_native_abi_probe.cmd /DMRB_USE_DEBUG_HOOK` prints diagnostic offsets and class-field matches; its exit code alone is not an ABI assertion. The asserted combined probe is `tools/defined-compiler/probe_windows_archive.ps1`. Other platforms require their own measured configuration.
+- Windows links root `lib/libmruby_x64.lib`; regexp additionally links `lib/onigmo_s.lib`.
+- Linux links `mruby_x64` by name with `$ORIGIN`; macOS uses `@loader_path`.
+- macOS has x86_64 and arm64 targets combined by a phony universal target and `lipo`.
+- Non-debug lipo lookup uses a `release` output directory; follow the CI's release-mode invocation.
+- Linux/macOS regexp compiles the explicit Onigmo source list; zlib compiles the bundled `zlib-1.3.1` sources.
+- Off-Windows zlib defines `HAVE_UNISTD_H` because its inline build bypasses configure.
+- Host libraries in `lib/` are prebuilt inputs; this tree does not produce them.
+- Out-of-tree extensions must resolve exception symbols dynamically when host presym tables change. The defined? host candidate shifted ArgumentError from1245 to1248 despite matching state layout; Marshal's shared header overrides MRB_ERROR_SYM with mrb_intern_lit so E_ARGUMENT_ERROR cannot resolve an unrelated class.
 
 ## BUILD
+```sh
+git submodule update --init --recursive
+cd mruby-ext
+# Set MRUBY_DIR in the shell before building on another machine.
+xmake
 ```
-xmake          # root mruby-ext/ — xmake.lua just includes the 4 subdir targets
-# then copy build/windows/x64/<mode>/lib*_ext_x64.dll → Assets/Plugins/windows/
-```
+- Copy the Windows gem DLLs from `build/windows/x64/<mode>/` to root `Plugins/windows/` beside the matching host DLL.
+- Actual Linux x86-64 and macOS arm64 host/extension builds and runtime contracts are measured in `docs/compatibility/current-status.md`. The CI recipes remain separate from those local runs; macOS universal/Intel execution is unverified.
 
-## CONVENTIONS (per-gem xmake.lua)
-- `set_arch("x64") set_kind("shared")`; defines `MRB_INT64 MRB_UTF8_STRING` — **must match how host mruby was built** or symbols mismatch at load. (mruby 4.0.0 removed `MRB_NO_PRESYM`; out-of-tree gems use runtime `mrb_intern_lit` instead of the compile-time `MRB_SYM(x)` presym macro.)
-- Links the prebuilt host mruby: Windows `lib/libmruby_x64.lib` (+ `onigmo_s.lib` for regexp), via Windows `export.def`.
-- `mruby_dir` is **hardcoded** to `E:/Projects/mruby-for-dotnet/mruby` (the mruby-for-dotnet checkout's build/host headers). Update this path on a new machine.
-- macOS/linux branches exist (universal `lipo`) but only Windows x64 DLLs are shipped/committed.
-
-## GOTCHAS
-- DLL basename + the `[DllImport("libmruby_*_x64")]` string + `export.def` exported symbol must all agree.
-- `lib/`, `build/`, `.xmake/` are gitignored build inputs/outputs; the host `.lib` files are prebuilt, not produced here.
+## ANTI-PATTERNS
+- Do not inline Onigmo on Windows without `ONIG_EXTERN=extern`; the target deliberately keeps the prebuilt archive.
+- Keep actual DLL basenames, C# DllImport strings in `Scripts/RubyScriptManager.cs`, and exported init symbols aligned.
+- `export.def` LIBRARY labels omit parts of current basenames; the EXPORTS symbols and xmake basenames are load-bearing.
+- Preserve each gem's `_gem_final` export alongside `_gem_init`, even though current C# initialization imports only init.
+- Mirror shared platform/ABI changes across all four target files; regexp has additional engine-specific requirements.

@@ -1,4 +1,4 @@
-﻿class RPG::Map
+class RPG::Map
   def initialize(width, height)
     @display_name = ''
     @tileset_id = 1
@@ -6,8 +6,8 @@
     @height = height
     @scroll_type = 0
     @specify_battleback = false
-    @battleback_floor_name = ''
-    @battleback_wall_name = ''
+    @battleback1_name = ''
+    @battleback2_name = ''
     @autoplay_bgm = false
     @bgm = RPG::BGM.new
     @autoplay_bgs = false

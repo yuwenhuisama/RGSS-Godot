@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Sprite
@@ -7,6 +7,7 @@ class Sprite
   attr_reader :__handler__
 
   def initialize(viewport = nil)
+    @viewport = viewport
     if viewport.nil?
       @__handler__ = Unity::Sprite.new_with_viewport(Viewport::DEFAULT_VIEWPORT.__handler__)
     else
@@ -28,6 +29,7 @@ class Sprite
   end
 
   def bitmap
+    return @bitmap if @bitmap
     handler = @__handler__.bitmap
     handler.nil? ? nil : Bitmap.new(handler)
   end
@@ -35,22 +37,26 @@ class Sprite
   def bitmap=(bitmap)
     check_arguments([bitmap], [[Bitmap, NilClass]])
     if bitmap.nil?
+      @bitmap = nil
       @__handler__.bitmap = nil
       return
     end
     @__handler__.bitmap = bitmap.__handler__
+    @bitmap = bitmap
   end
 
   def src_rect
-    Rect.new @__handler__.src_rect
+    @src_rect ||= Rect.new(@__handler__.src_rect)
   end
 
   def src_rect=(rect)
     check_arguments([rect], [Rect])
     @__handler__.src_rect = rect.__handler__
+    @src_rect = rect
   end
 
   def viewport
+    return @viewport if @viewport
     if @__handler__.viewport == Viewport::DEFAULT_VIEWPORT.__handler__
       return nil
     end
@@ -58,6 +64,7 @@ class Sprite
   end
 
   def viewport=(viewport)
+    @viewport = viewport
     check_arguments([viewport], [[Viewport, NilClass]])
     if viewport.nil?
       @__handler__.viewport = Viewport::DEFAULT_VIEWPORT.__handler__
@@ -67,21 +74,23 @@ class Sprite
   end
 
   def color
-    Color.new @__handler__.color
+    @color ||= Color.new(@__handler__.color)
   end
 
   def color=(color)
     check_arguments([color], [Color])
     @__handler__.color = color.__handler__
+    @color = color
   end
 
   def tone
-    Tone.new @__handler__.tone
+    @tone ||= Tone.new(@__handler__.tone)
   end
 
   def tone=(tone)
     check_arguments([tone], [Tone])
     @__handler__.tone = tone.__handler__
+    @tone = tone
   end
 
   def opacity=(opacity)
@@ -145,3 +154,6 @@ class Sprite
     define_method("#{prop}=") { |value| @__handler__.send("#{prop}=", value) }
   end
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Sprite)

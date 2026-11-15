@@ -59,6 +59,10 @@ namespace RGSSUnity.RubyClasses
             return res;
         }
 
+        [RbClassMethod("exist?")]
+        public static RbValue Exists(RbState state, RbValue self, RbValue name)
+            => (Godot.OS.GetSystemFontPath(name.ToStringUnchecked()!).Length > 0).ToValue(state);
+
         [RbInstanceMethod("name")]
         public static RbValue GetName(RbState state, RbValue self)
         {

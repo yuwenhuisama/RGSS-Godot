@@ -100,7 +100,7 @@ iterations.times do |iteration|
   sprites.clear
   windows.clear
   bitmaps.clear
-  GC.start if defined?(GC) && GC.respond_to?(:start)
+  GC.start if GC.respond_to?(:start)
 end
 
 true

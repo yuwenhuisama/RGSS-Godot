@@ -10,7 +10,7 @@ public class SpriteData : RubyData
 
     public int X;
     public int Y;
-    public int Z = 1;
+    public int Z;
     public int Ox;
     public int Oy;
 
@@ -27,7 +27,7 @@ public class SpriteData : RubyData
     public ColorData? Color;
 
     public float BushDepth;
-    public int BushOpacity = 255;
+    public int BushOpacity = 128;
     public float WaveAmp;
     public float WaveLength = 24.0f;
     public float WaveSpeed = 360.0f;

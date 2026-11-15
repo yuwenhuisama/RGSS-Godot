@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Tilemap
@@ -7,6 +7,7 @@ class Tilemap
   attr_reader :__handler__
 
   def initialize(viewport = nil)
+    @viewport = viewport
     @__handler__ = Unity::Tilemap.new(viewport&.__handler__)
     # Persistent proxy so `tilemap.bitmaps[i] = bmp` forwards to the native handler
     # (a plain array getter would discard the assignment).
@@ -59,9 +60,9 @@ class Tilemap
   end
 
   def viewport=(viewport)
-    check_arguments([viewport], [Viewport])
+    check_arguments([viewport], [[Viewport, NilClass]])
     @viewport = viewport
-    @__handler__.viewport = viewport.__handler__
+    @__handler__.viewport = viewport&.__handler__
   end
 
   def eql?(other)
@@ -101,3 +102,6 @@ class Tilemap
     end
   end
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Tilemap)

@@ -28,6 +28,7 @@
     -->
     <PackageReference Include="MRuby.Library" Version="0.2.0" ExcludeAssets="contentFiles" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="MeltySynth" Version="2.4.1" />
     <TrimmerRootAssembly Include="RGSS-Godot" />
   </ItemGroup>
 
@@ -40,11 +41,28 @@
   -->
   <ItemGroup>
     <Compile Remove="mruby-ext/**/*.cs" />
+    <Compile Remove="tools/audio-loopback/**/*.cs" />
     <EmbeddedResource Remove="mruby-ext/**/*" />
     <None Remove="mruby-ext/**/*" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Plugins\midi\**\*" Condition="Exists('Plugins\midi')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Plugins\windows\audio\**\*" Condition="Exists('Plugins\windows\audio')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Plugins\macos\audio\**\*" Condition="Exists('Plugins\macos\audio')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Plugins\linux\audio\**\*" Condition="Exists('Plugins\linux\audio')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="Plugins\windows\*.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>

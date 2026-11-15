@@ -8,6 +8,12 @@ uniform vec2 scroll_speed = vec2(0.0, 0.0);
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
+varying vec4 window_modulate;
+
+void vertex() {
+    window_modulate = COLOR;
+}
+
 void fragment() {
     vec2 uv = UV * tile_scale;
     uv.y -= tile_scale.y - 1.0;
@@ -20,5 +26,5 @@ void fragment() {
     col.rgb = mix(col.rgb, vec3(luma), tone.a);
     col.rgb += tone.rgb;
 
-    COLOR = col;
+    COLOR = col * window_modulate;
 }

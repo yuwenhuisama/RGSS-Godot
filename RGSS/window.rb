@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Window
@@ -11,8 +11,8 @@ class Window
     @__handler__ = Unity::Window.new_xywh(x, y, width, height, Viewport::DEFAULT_VIEWPORT.__handler__)
     self.cursor_rect = Rect.create_default_rect
     self.contents = Bitmap.create_default_bitmap
-    self.padding = 12
-    self.padding_bottom = 12
+    self.padding = 8
+    self.padding_bottom = 8
   end
 
   def move(x, y, w, h)
@@ -21,33 +21,38 @@ class Window
   end
 
   def windowskin
-    Bitmap.new @__handler__.windowskin
+    handler = @__handler__.windowskin
+    handler.nil? ? nil : (@windowskin ||= Bitmap.new(handler))
   end
 
   def windowskin=(bitmap)
-    check_arguments([bitmap], [Bitmap])
-    @__handler__.windowskin = bitmap.__handler__
+    check_arguments([bitmap], [[Bitmap, NilClass]])
+    @__handler__.windowskin = bitmap&.__handler__
+    @windowskin = bitmap
   end
 
   def contents
-    Bitmap.new @__handler__.contents
+    @contents ||= Bitmap.new(@__handler__.contents)
   end
 
   def contents=(contents)
     check_arguments([contents], [Bitmap])
     @__handler__.contents = contents.__handler__
+    @contents = contents
   end
 
   def cursor_rect
-    Rect.new @__handler__.cursor_rect
+    @cursor_rect ||= Rect.new(@__handler__.cursor_rect)
   end
 
   def cursor_rect=(rect)
     check_arguments([rect], [Rect])
     @__handler__.cursor_rect = rect.__handler__
+    @cursor_rect = rect
   end
 
   def viewport
+    return @viewport if @viewport
     if @__handler__.viewport == Viewport::DEFAULT_VIEWPORT.__handler__
       nil
     else
@@ -56,8 +61,9 @@ class Window
   end
 
   def viewport=(viewport)
-    check_arguments([viewport], [Viewport])
-    @__handler__.viewport = viewport.__handler__
+    check_arguments([viewport], [[Viewport, NilClass]])
+    @__handler__.viewport = (viewport || Viewport::DEFAULT_VIEWPORT).__handler__
+    @viewport = viewport
   end
 
   def eql?(other)
@@ -132,12 +138,13 @@ class Window
   end
   
   def tone
-    Tone.new @__handler__.tone
+    @tone ||= Tone.new(@__handler__.tone)
   end
   
   def tone=(tone)
     check_arguments([tone], [Tone])
     @__handler__.tone = tone.__handler__
+    @tone = tone
   end
 
   [:dispose, :disposed?, :update, :open?, :close?].each do |method|
@@ -154,8 +161,8 @@ class Window
     :x => [Integer, Float],
     :y => [Integer, Float],
     :z => Integer,
-    :ox => Integer,
-    :oy => Integer,
+    :ox => [Integer, Float],
+    :oy => [Integer, Float],
     :padding => Integer,
     :padding_bottom => Integer,
   }
@@ -170,3 +177,6 @@ class Window
     end
   end
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Window)

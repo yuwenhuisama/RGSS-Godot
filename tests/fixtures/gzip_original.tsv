@@ -1,0 +1,8 @@
+write	13	13
+writer-closed	true
+metadata	fixture.txt	compatibility	946684800
+line	"first\n"	1	6
+rest	"second\n"	true
+rewind	0	"first\nsecond\n"
+reader-closed	true
+corrupt	Zlib::GzipFile::Error

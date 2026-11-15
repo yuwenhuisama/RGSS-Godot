@@ -74,7 +74,7 @@ internal static class TilemapRenderer
     }
 
     // RGSS3 flash-tile blink alpha table (mkxp-z tilemapvx.cpp): 32-frame cycle, fades in
-    // then out; the rendered alpha is additionally halved at draw time.
+    // then out; the original adds this full intensity to the tile color.
     public static readonly byte[] FlashAlpha =
     {
         0x78, 0x78, 0x78, 0x78, 0x96, 0x96, 0x96, 0x96,
@@ -86,7 +86,7 @@ internal static class TilemapRenderer
     public const int FlashCycle = 32;
 
     // Flash overlay: a packed 0xRGB (4-bit each) colour additively blended over the tile,
-    // pulsing via FlashAlpha. Matches mkxp: out.rgb += colour.rgb * (FlashAlpha[idx]/255/2).
+    // pulsing via FlashAlpha: out.rgb += colour.rgb * FlashAlpha[idx]/255.
     public static void DrawFlash(Image dst, int px, int py, int packed, int flashIdx)
     {
         if ((packed & 0x0FFF) == 0)
@@ -95,7 +95,7 @@ internal static class TilemapRenderer
         var r = ((packed >> 8) & 0xF) / 15.0f;
         var g = ((packed >> 4) & 0xF) / 15.0f;
         var b = (packed & 0xF) / 15.0f;
-        var alpha = FlashAlpha[((flashIdx % FlashCycle) + FlashCycle) % FlashCycle] / 255.0f / 2.0f;
+        var alpha = FlashAlpha[((flashIdx % FlashCycle) + FlashCycle) % FlashCycle] / 255.0f;
 
         var dr = r * alpha;
         var dg = g * alpha;
@@ -172,7 +172,7 @@ internal static class TilemapRenderer
             return DrawWaterfall(dst, src, ox, wox, pattern, px, py);
         }
 
-        var blockX = ox + animA * 2;
+        var blockX = ox + (slot is 2 or 3 ? 0 : animA * 2);
         return DrawAutotileA(dst, src, blockX * TileSize, oy * TileSize, pattern, px, py);
     }
 
@@ -186,17 +186,17 @@ internal static class TilemapRenderer
             2 => (6, 0, false),   // "unanimated" cols 6-7 used as a stable block
             3 => (6, 3, false),
             4 => (8, 0, false),
-            5 => (0, 0, true),
+            5 => (14, 0, true),
             6 => (8, 3, false),
-            7 => (0, 3, true),
+            7 => (14, 3, true),
             8 => (0, 6, false),
-            9 => (0, 6, true),
+            9 => (6, 6, true),
             10 => (0, 9, false),
-            11 => (0, 9, true),
+            11 => (6, 9, true),
             12 => (8, 6, false),
-            13 => (8, 6, true),
+            13 => (14, 6, true),
             14 => (8, 9, false),
-            _ => (8, 9, true),
+            _ => (14, 9, true),
         };
     }
 
@@ -266,11 +266,11 @@ internal static class TilemapRenderer
         return drew;
     }
 
-    // Wall-type: 16 shapes x 4 quarters; patterns >= 16 draw nothing.
+    // Unused wall shapes repeat the block's first quarter in the original engine.
     private static bool DrawAutotileWall(Image dst, BitmapData src, int originX, int originY, int pattern, int px, int py)
     {
         if (pattern >= 16)
-            return false;
+            return DrawRepeatedQuarter(dst, src, originX, originY, px, py);
         var drew = false;
         for (var q = 0; q < 4; q++)
         {
@@ -303,15 +303,25 @@ internal static class TilemapRenderer
     // Waterfall (A1 sub-type): 4 shapes x 2 half-columns (full tile height).
     private static bool DrawWaterfall(Image dst, BitmapData src, int oxTiles, int oyTiles, int pattern, int px, int py)
     {
-        var shape = pattern % 4;
         var baseX = oxTiles * TileSize;
         var baseY = oyTiles * TileSize;
+        if (pattern >= 4)
+            return DrawRepeatedQuarter(dst, src, baseX, baseY, px, py);
+        var shape = pattern;
         var drew = false;
         for (var h = 0; h < 2; h++)
         {
             var r = AutotileTables.C[shape * 2 + h];
             drew |= Blend(dst, src, baseX + r.X, baseY + r.Y, px + h * Half, py, Half, TileSize);
         }
+        return drew;
+    }
+
+    private static bool DrawRepeatedQuarter(Image dst, BitmapData src, int originX, int originY, int px, int py)
+    {
+        var drew = false;
+        foreach (var offset in QuarterDst)
+            drew |= Blend(dst, src, originX, originY, px + offset.X, py + offset.Y, Half, Half);
         return drew;
     }
 

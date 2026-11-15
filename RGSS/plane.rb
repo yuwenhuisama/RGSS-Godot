@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Plane
@@ -7,6 +7,7 @@ class Plane
   attr_reader :__handler__
 
   def initialize(viewport = nil)
+    @viewport = viewport
     check_type(viewport, [Viewport, NilClass])
     if viewport.nil?
       @__handler__ = Unity::Plane.new_with_viewport(Viewport::DEFAULT_VIEWPORT.__handler__)
@@ -18,6 +19,7 @@ class Plane
   [:dispose, :disposed?].each { |method_name| define_method(method_name) { @__handler__.send(method_name) } }
 
   def bitmap
+    return @bitmap if @bitmap
     handler = @__handler__.bitmap
     handler.nil? ? nil : Bitmap.new(handler)
   end
@@ -25,9 +27,11 @@ class Plane
   def bitmap=(value)
     check_type(value, [Bitmap, NilClass])
     @__handler__.bitmap = value&.__handler__
+    @bitmap = value
   end
 
   def viewport
+    return @viewport if @viewport
     if @__handler__.viewport == Viewport::DEFAULT_VIEWPORT.__handler__
       return nil
     end
@@ -37,24 +41,27 @@ class Plane
   def viewport=(value)
     check_type(value, [Viewport, NilClass])
     @__handler__.viewport = (value || Viewport::DEFAULT_VIEWPORT).__handler__
+    @viewport = value
   end
 
   def color
-    Color.new @__handler__.color
+    @color ||= Color.new(@__handler__.color)
   end
 
   def color=(value)
     check_type(value, Color)
     @__handler__.color = value.__handler__
+    @color = value
   end
 
   def tone
-    Tone.new @__handler__.tone
+    @tone ||= Tone.new(@__handler__.tone)
   end
 
   def tone=(value)
     check_type(value, Tone)
     @__handler__.tone = value.__handler__
+    @tone = value
   end
 
   def eql?(other)
@@ -87,3 +94,6 @@ class Plane
     end
   end
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Plane)

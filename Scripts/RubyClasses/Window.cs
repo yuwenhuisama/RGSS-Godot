@@ -48,7 +48,11 @@ public static class Window
     {
         // RGSS3 Window#update advances the cursor-blink and pause-sign animation,
         // called once per game frame. We drive both off this per-window tick.
-        self.GetRDataObject<WindowData>().AnimationTick++;
+        var data = self.GetRDataObject<WindowData>();
+        data.AnimationTick++;
+        data.CursorTick = data.Active ? data.CursorTick + 1 : 16;
+        if (data.Pause)
+            data.PauseFadeTick++;
         return state.RbNil;
     }
 
@@ -213,7 +217,10 @@ public static class Window
     [RbInstanceMethod("pause=")]
     public static RbValue SetPause(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<WindowData>().Pause = value.IsTrue;
+        var data = self.GetRDataObject<WindowData>();
+        if (!data.Pause && value.IsTrue)
+            data.PauseFadeTick = 0;
+        data.Pause = value.IsTrue;
         return state.RbNil;
     }
 

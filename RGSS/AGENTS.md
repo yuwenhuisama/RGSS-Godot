@@ -1,44 +1,40 @@
-# Assets/Resources/RGSS — RUBY-SIDE RGSS3 + RMVA DATA MODEL
+# RUBY RGSS3 WRAPPERS AND RMVA DATA
 
-Layer 1 (pure-Ruby wrappers) + bootstrap + RMVA data classes. Loaded as Unity `TextAsset`s via `Resources.Load("RGSS/<name>")` — NOT a filesystem `require`. Parent AGENTS.md covers the 3-layer architecture.
+## OVERVIEW
+Ruby bootstrap, compatibility patches and Marshal data classes; score 9, an existing distinct domain retained and corrected.
 
-## BOOT FILES (load order matters)
-| File | Role |
-|------|------|
-| `main.rb` | Entry. Sets `$rmva_project_base_path`/`$rtp_path`, `require`s built-ins, Marshal-loads `Scripts.rvdata2`, runs RMVA scripts, then `require 'patch_rmva'` + invokes `$rgss_main_callback` |
-| `kernel.rb` | `rgss_main`, `load_data`/`save_data` (Marshal vs RMProject paths), `msgbox` → `Unity.msgbox` |
-| `patch_rmva.rb` | **The compatibility core.** Monkey-patches `SceneManager.run` → Fiber loop; `Scene_Base#main` → `__yield_update` (Fiber.yield per frame); reroutes `Audio`/`Cache`/`DataManager` file paths to RMProject + RTP fallback |
-| `rgss_error.rb`, `rgss_reset.rb` | RGSSError class; F12 reset handling |
+## WHERE TO LOOK
+| Task | Location | Contract |
+|------|----------|----------|
+| Entry and built-in load order | `main.rb` | Registers scripts, constructs the main fiber and invokes the callback |
+| Callback and data IO | `kernel.rb` | `rgss_main`, reset retry, Marshal load/save |
+| Frame barrier and waits | `graphics.rb` | Native update, reset check, then one `Fiber.yield` |
+| Stock-script compatibility | `patch_rmva.rb` | SceneManager, path rerouting, MRI comparator semantics |
+| Disposed resource guards | `resource_lifecycle.rb` | Wraps methods of six resource classes |
+| Argument checks | `type_check_util.rb` | Ruby TypeError/ArgumentError before the native boundary |
+| Native gem shims | `ext/` | Directory glob and Onigmo-backed String methods |
+| Serialized RPG objects | `rpg/` | Defaults/accessors and dotted filenames for nested constants |
 
-## WRAPPER PATTERN (every built-in `*.rb` follows this)
-```ruby
-require 'type_check_util'
-class Sprite
-  include TypeCheckUtil
-  attr_reader :__handler__
-  def initialize(viewport = nil)
-    @__handler__ = Unity::Sprite.new_with_viewport(viewport&.__handler__ || Viewport::DEFAULT_VIEWPORT.__handler__)
-  end
-  def bitmap=(bitmap)
-    check_arguments([bitmap], [[Bitmap, NilClass]])   # type-guard BEFORE crossing to C#
-    @__handler__.bitmap = bitmap&.__handler__
-  end
-  # bulk-define trivial accessors via metaprogramming:
-  [:x, :y, :z, :ox, :oy].each do |p|
-    define_method(p) { @__handler__.send(p) }
-    define_method("#{p}=") { |v| @__handler__.send("#{p}=", v) }
-  end
-end
-```
-- `@__handler__` holds the `Unity::*` native object. Always pass `other.__handler__` across the boundary, never the wrapper.
-- `type_check_util.rb` (`check_type`/`check_arguments`) guards args Ruby-side so C# bindings can assume valid types. RMVA passes a single accessor's value; arrays mean "any of these classes".
+## CONVENTIONS
+- `main.rb` republishes the existing `Kernel.eval` as a module function before loading any game code.
+- Preserve that method entry: damage formulas need the caller's `a`, `b`, and `v` locals.
+- `run_scripts` Marshal-loads `RMProject/Data/Scripts.rvdata2` and registers compressed RMVA scripts.
+- Native `run_rmva_scripts` loads `ext/`, then `rpg/`, then returns game-script procs.
+- `patch_rmva` loads after game scripts only when DataManager, Cache and SceneManager exist.
+- Require names map to plain files under root `RGSS/`, or the executable's `RGSS/` directory, through the custom dedup loader.
+- Wrappers store a native `Unity::*` object in `@__handler__`; pass other objects' handlers across the binding boundary.
+- Lowercase wrapper filenames match require names; a new binding also needs its C# counterpart and bootstrap require.
+- `TypeCheckUtil` arrays express accepted type alternatives; accessor loops use `define_method` for repetitive properties.
+- `ResourceLifecycle.guard` applies to Bitmap, Plane, Sprite, Tilemap, Viewport and Window.
+- Its exemptions include initialize, dispose, disposed?, handler access, hash and eql?; disposed property access raises `RGSSError`.
+- `rpg/` classes preserve Marshal-compatible defaults; `event.page.condition.rb` maps to `RPG::Event::Page::Condition`.
+- Callback reset retries preserve the default viewport; scene termination owns resource disposal.
 
-## SUBDIRECTORIES (loaded by `UnityModule.RunRmvaScripts` via `LoadAllScriptInResources`)
-- `ext/` — Ruby shims for native gems: `dir_glob.rb`, `dir.rb`, `onig_regexp.rb` (loaded before rpg/).
-- `rpg/` — ~40 `RPG::*` data classes (Actor/Map/Event/Troop/Skill/…), Marshal-compatible with RMVA's `.rvdata2`. Formulaic: `initialize` defaults + `attr_accessor`s + dotted filenames map nesting (`event.page.condition.rb` → `RPG::Event::Page::Condition`). Add new ones by copying a sibling.
-
-## RULES
-- New built-in `Foo`: create `foo.rb` here AND `RubyClasses/Foo.cs`, then add `require 'foo'` to `main.rb`'s begin block.
-- `require 'x'` resolves to `Resources/RGSS/x.rb` through `Kernel.cs` (dedup set), NOT a real load path. Keep names lowercase matching the TextAsset.
-- Inside a `rescue`, route to `Unity.on_top_exception` / `format_exc_string` — never raw `p`/`Debug.Log` (native stacktrace crash).
-- Patches use `alias :old_x :x` then redefine — preserve this when extending `patch_rmva.rb`.
+## ANTI-PATTERNS
+- Do not restore per-callsite yields in Scene_Base, title/end windows, fades or battle waits: `Graphics.update` now supplies the barrier.
+- `tests/test_frame_loop.gd` checks direct update/wait cadence; `tests/test_reset_callback.gd` checks callback retry.
+- Keep alias-then-redefine behavior in compatibility patches and String shims; callers rely on the preserved native methods.
+- `Array#sort`/`sort!` normalize comparator results by sign; float differences in stock battle ordering must remain valid.
+- Cache probes project/RTP bitmap existence before invoking the C# constructor: native callback exceptions cannot drive Ruby fallback.
+- In rescue paths use `Unity.on_top_exception(format_exc_string(e))` to retain the Ruby backtrace in queued logging.
+- Do not remove the live `Unity::` API name because of the Godot migration; it is the registered mruby module.

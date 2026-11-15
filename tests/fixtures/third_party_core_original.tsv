@@ -1,0 +1,11 @@
+imported	true
+resolution	640	416
+group	-1234567	-1,234,567
+group	0	0
+group	1234567	1,234,567
+group	12345.5	12,345.5
+animation-rate	3	7
+font	24	false	false	160
+gauge-cap	255	0
+party	1
+forced-restore	1	true

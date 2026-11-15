@@ -1,0 +1,16 @@
+defined-constant	constant
+defined-missing	nil
+defined-method	method
+defined-global	global-variable
+defined-side-effect	assignment
+integer-division	-3
+modulo	2
+utf8-length	2
+binary-length	6
+encoding-switch-back	6,2
+sort-float	1,2,3
+string-format	007:1.25
+regexp-capture	b
+block-return	2
+symbol-hash	42
+defined-side-effect-count	0

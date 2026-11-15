@@ -1,0 +1,9 @@
+rb	all	ASCII-8BIT	4	4	c3a900ff
+rb	4	ASCII-8BIT	4	4	c3a900ff
+rb	0	ASCII-8BIT	0	0	
+r	all	UTF-8	3	4	c3a900ff
+r	4	ASCII-8BIT	4	4	c3a900ff
+r	0	ASCII-8BIT	0	0	
+outbuf	true	UTF-8	3	4	c3a900ff
+sysread	ASCII-8BIT	4	4	c3a900ff
+integer-binary	UTF-8	3	4	c3a900ff

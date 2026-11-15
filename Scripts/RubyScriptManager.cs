@@ -18,8 +18,16 @@ public class RubyScriptManager
 
     public RbState State { get; private set; } = null!;
     private RbClass unityModule;
-    private RbContext? context;
     private RbCompiler? compiler;
+    private static bool nativeResolverConfigured;
+
+    [DllImport("libmruby_x64", CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static extern bool mrb_open_failure_p(IntPtr mrb);
+
+    [DllImport("libmruby_x64", CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static extern bool mrb_check_error(IntPtr mrb);
 
     [DllImport("libmruby_marshal_c_ext_x64", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     private static extern void mrb_mruby_marshal_c_gem_init(IntPtr mrb);
@@ -40,7 +48,6 @@ public class RubyScriptManager
         ConfigureNativeDllPath();
 
         this.State = Ruby.Open();
-        this.context = this.State.NewCompileContext();
         this.compiler = this.State.NewCompiler();
 
         InitGem("marshal_c", mrb_mruby_marshal_c_gem_init);
@@ -156,7 +163,8 @@ public class RubyScriptManager
             return this.State.RbNil;
 
         GD.Print($"Loaded RMVA script: {fileName}");
-        this.context!.Value.SetFilename($"{fileName}.rmvascript");
+        using var loadContext = this.State.NewCompileContext();
+        loadContext.SetFilename($"{fileName}.rmvascript");
         this.compiler!.SetFilename($"{fileName}.rmvascript");
 
         // MRuby.Library >= 0.1.8 marshals the script string to the native loader as UTF-8
@@ -164,8 +172,10 @@ public class RubyScriptManager
         // Chinese Windows locale), which re-encoded UTF-8 RGSS string literals to GBK
         // inside mruby and rendered them as mojibake. Keep the package at >= 0.1.8.
         var result = this.State.Protect(
-            (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
+            (_, _, _) => this.compiler.LoadString(scriptContent, loadContext),
             ref error);
+
+        result = CheckLoadError(result, ref error, fileName);
 
         if (error)
             GD.PrintErr($"Error in RMVA script {fileName}: {SafeClassName(result)}");
@@ -180,8 +190,7 @@ public class RubyScriptManager
 
         this.compiler?.Dispose();
         this.compiler = null;
-        if (this.context is not null) this.context.Value.Dispose();
-        this.context = null;
+        RGSSUnity.RubyClasses.UnityModule.ReleaseUpdateFiber(this.State);
         Ruby.Close(this.State);
         this.State = null!;
         Kernel.Reset();
@@ -192,17 +201,33 @@ public class RubyScriptManager
     private RbValue LoadScriptContent(string fileName, string scriptContent, out bool error)
     {
         error = false;
-        this.context!.Value.SetFilename($"{fileName}.rb");
+        using var loadContext = this.State.NewCompileContext();
+        loadContext.SetFilename($"{fileName}.rb");
         this.compiler!.SetFilename($"{fileName}.rb");
 
         var result = this.State.Protect(
-            (_, _, _) => this.compiler.LoadString(scriptContent, this.context.Value),
+            (_, _, _) => this.compiler.LoadString(scriptContent, loadContext),
             ref error);
+
+        result = CheckLoadError(result, ref error, fileName);
 
         if (error)
             GD.PrintErr($"Error in script {fileName}: {SafeClassName(result)}");
 
         return result;
+    }
+
+    private RbValue CheckLoadError(RbValue result, ref bool error, string fileName)
+    {
+        // mrb_load_string_cxt catches its own exceptions and leaves mrb->exc
+        // set, so the outer protect flag alone cannot report compilation errors.
+        if (!mrb_open_failure_p(this.State.NativeHandler))
+            return result;
+
+        this.State.PrintError();
+        error |= mrb_check_error(this.State.NativeHandler);
+        return this.State.GenerateExceptionWithNewStr(
+            this.State.GetClass("RuntimeError"), $"Failed to load Ruby script: {fileName}; see preceding exception backtrace.");
     }
 
     private void InitGem(string gemName, Action<IntPtr> init)
@@ -229,6 +254,8 @@ public class RubyScriptManager
 
     private static void ConfigureNativeDllPath()
     {
+        if (nativeResolverConfigured)
+            return;
         var baseDir = AppContext.BaseDirectory;
         var projectDir = ProjectSettings.GlobalizePath("res://");
         var exeDir = Path.GetDirectoryName(
@@ -258,6 +285,7 @@ public class RubyScriptManager
         var candidateDirs = new[]
         {
             baseDir,
+            Path.Combine(baseDir, "Plugins", pluginSubdir),
             exeDir,
             projectDir,
             Path.Combine(projectDir, "Plugins", pluginSubdir),
@@ -269,6 +297,7 @@ public class RubyScriptManager
 
         NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(), ResolveLib);
         NativeLibrary.SetDllImportResolver(typeof(Ruby).Assembly, ResolveLib);
+        nativeResolverConfigured = true;
 
         var existingPath = System.Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         var prefix = string.Join(Path.PathSeparator, candidateDirs.Where(Directory.Exists));

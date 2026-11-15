@@ -1,5 +1,13 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 module Kernel
+  def run_rgss_main_callback
+    begin
+      $rgss_main_callback.call if $rgss_main_callback
+    rescue RGSSReset
+      Unity.reset_rgss_resources
+      retry
+    end
+  end
   def rgss_main(&callback)
     $rgss_main_callback = callback
   end
@@ -14,8 +22,9 @@ module Kernel
 
   def load_data(filename)
     file_full_path = File.join($rmva_project_base_path, "RMProject", filename)
-    f = File.open(file_full_path, "rb")
-    Marshal.load(f)
+    File.open(file_full_path, "rb") do |f|
+      Marshal.load(f)
+    end
   end
 
   def save_data(obj, filename)

@@ -1,0 +1,43 @@
+deflate-close-wrapped-unfinished	
+deflate-params-continue	native payload
+raw-sync-bytes	2a48acccc94f4c01000000ffff
+inflate-sync-point-positive	payload,true
+deflate-close-unfinished	error	Zlib::DataError
+inflate-sync-raw-recovery	true,payload,true
+stream-capacity-reset	0
+deflate-params	true,native payload
+deflate-params-invalid	error	Zlib::StreamError
+deflate-params-no-capacity	Zlib::StreamError,
+inflate-sync-point	false
+inflate-sync-missing	false
+inflate-sync-recovery	true,,Zlib::DataError
+stream-state-aliases	false,false,true,true
+stream-buffer-state	0,0,2,0,0
+stream-flush-output	payload,0
+inflate-flush-input	0,,,tail
+stream-output-capacity	0,128,0,payload
+deflate-append	true,native payload
+inflate-append	true,payload
+inflate-later-tail	payload,,firstsecond
+deflate-block-open	error	NoMethodError
+inflate-dictionary-retained-input	,false
+inflate-trailing-input	payload,tail
+deflate-flush-method	native ,payload
+deflate-dictionary	true,78bb7f4d09e8cb4391000029f10592,703661458
+inflate-dictionary	Zlib::NeedDict,true,true,native payload,true
+inflate-wrong-dictionary	error	Zlib::DataError
+deflate-sync-flush	native ,payload,true
+large-chunks	true,28000,28000
+deflate-nil-finish	payload,true
+inflate-finish-complete	0
+inflate-reset	second,6
+stream-double-close	error	Zlib::Error
+deflate-invalid-level	error	Zlib::StreamError
+inflate-invalid-window	error	Zlib::StreamError
+deflate-chunks	native payload,true,14,true
+inflate-chunks	native payload,true,true,14
+deflate-finish	payload,true
+inflate-finish-truncated	error	Zlib::BufError
+deflate-reset	second,6
+stream-close	false,true
+stream-after-close	error	Zlib::Error

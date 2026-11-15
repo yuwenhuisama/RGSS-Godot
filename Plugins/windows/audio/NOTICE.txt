@@ -1,0 +1,3 @@
+This software uses FFmpeg under the GNU LGPL version 2.1 or later.
+This software is based in part on the work of the Independent JPEG Group.
+Unmodified corresponding source is included beside the executable.

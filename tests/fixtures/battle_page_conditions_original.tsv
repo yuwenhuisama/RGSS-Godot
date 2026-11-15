@@ -1,0 +1,18 @@
+none	false
+turn	0	0	0	true
+turn	1	1	0	true
+turn	2	1	0	false
+turn	1	1	2	true
+turn	2	1	2	false
+turn	3	1	2	true
+enemy-hp	49	false
+enemy-hp	50	true
+enemy-hp	51	true
+enemy-missing	false
+actor-hp	49	false
+actor-hp	50	true
+actor-hp	51	true
+switch	false	false
+switch	true	true
+turn-ending	false	false
+turn-ending	true	true

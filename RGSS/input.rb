@@ -1,7 +1,7 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
-module Kernel
+module Input
   DOWN = :DOWN
   LEFT = :LEFT
   RIGHT = :RIGHT
@@ -33,18 +33,15 @@ module Input
   VALID_KEYS = Set.new([DOWN, LEFT, RIGHT, UP, A, B, C, X, Y, Z, L, R, SHIFT, CTRL, ALT, F5, F6, F7, F8, F9])
 
   def self.press?(key)
-    check_arguments([key], [Symbol])
-    Unity::Input.press?(key) if VALID_KEYS.include? key
+    VALID_KEYS.include?(key) ? Unity::Input.press?(key) : false
   end
 
   def self.trigger?(key)
-    check_arguments([key], [Symbol])
-    Unity::Input.trigger?(key) if VALID_KEYS.include? key
+    VALID_KEYS.include?(key) ? Unity::Input.trigger?(key) : false
   end
 
   def self.repeat?(key)
-    check_arguments([key], [Symbol])
-    Unity::Input.repeat?(key) if VALID_KEYS.include? key
+    VALID_KEYS.include?(key) ? Unity::Input.repeat?(key) : false
   end
 
   [:update, :dir4, :dir8].each { |prop| define_singleton_method(prop) { Unity::Input.send(prop) } }

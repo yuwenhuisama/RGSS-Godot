@@ -20,18 +20,19 @@ class Bitmap
     elsif args.size == 2
       check_arguments(args, [Integer, Integer])
       width, height = args
+      raise RGSSError, 'failed to create bitmap' if width <= 0 || height <= 0
       @__handler__ = Unity::Bitmap.new_wh(width, height)
     else
       raise ArgumentError, "Invalid number of arguments"
     end
 
     self.font = Font.create_default_font
-    self.rect = Rect.create_default_rect
+    self.rect = Rect.new(0, 0, @__handler__.width, @__handler__.height)
   end
 
   def blt(x, y, src_bitmap, src_rect, opacity = 255)
-    check_arguments([x, y, src_bitmap, src_rect, opacity], [Integer, Integer, Bitmap, Rect, Integer])
-    @__handler__.blt(x, y, src_bitmap.__handler__, src_rect.__handler__, opacity)
+    check_arguments([x, y, src_bitmap, src_rect, opacity], [Numeric, Numeric, Bitmap, Rect, Integer])
+    @__handler__.blt(x.to_i, y.to_i, src_bitmap.__handler__, src_rect.__handler__, opacity)
   end
 
   def stretch_blt(dest_rect, src_bitmap, src_rect, opacity = 255)
@@ -69,7 +70,7 @@ class Bitmap
       x, y, width, height, color1, color2, vertical = args
 
       check_arguments([vertical], [[TrueClass, FalseClass, NilClass]])
-      vertical ||= false
+      vertical = args.size == 7
 
       @__handler__.gradient_fill_rect(x, y, width, height, color1.__handler__, color2.__handler__, vertical)
     else
@@ -118,8 +119,9 @@ class Bitmap
 
   def draw_text(*args)
     if args.size == 5 || args.size == 6
-      check_arguments(args[0..4], [Integer, Integer, Integer, Integer, Object])
+      check_arguments(args[0..4], [Numeric, Numeric, Numeric, Numeric, Object])
       x, y, width, height, str, align = args
+      x, y, width, height = [x, y, width, height].map { |value| value.to_i }
 
       unless str.is_a? String
         str = str.to_s
@@ -146,7 +148,7 @@ class Bitmap
   end
 
   def text_size(str)
-    check_arguments([str], [String])
+    str = str.to_s unless str.is_a?(String)
     Rect.new @__handler__.text_size(str)
   end
 
@@ -165,12 +167,13 @@ class Bitmap
   end
 
   def font
-    Font.new @__handler__.font
+    @font ||= Font.new(@__handler__.font)
   end
 
   def font=(font)
     check_arguments([font], [Font])
     @__handler__.font = font.__handler__
+    @font = font
   end
 
   def eql?(other)
@@ -194,3 +197,6 @@ class Bitmap
     Bitmap.new 1, 1
   end
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Bitmap)

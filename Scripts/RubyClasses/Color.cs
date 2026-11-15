@@ -7,10 +7,15 @@ namespace RGSSUnity.RubyClasses
 {
     public class ColorData : RubyData
     {
-        public float R;
-        public float G;
-        public float B;
-        public float A;
+        public double RedValue;
+        public double GreenValue;
+        public double BlueValue;
+        public double AlphaValue;
+
+        public float R { get => (float)(RedValue / 255.0); set => RedValue = value * 255.0; }
+        public float G { get => (float)(GreenValue / 255.0); set => GreenValue = value * 255.0; }
+        public float B { get => (float)(BlueValue / 255.0); set => BlueValue = value * 255.0; }
+        public float A { get => (float)(AlphaValue / 255.0); set => AlphaValue = value * 255.0; }
 
         public ColorData(RbState state) : base(state)
         {
@@ -20,16 +25,16 @@ namespace RGSSUnity.RubyClasses
     [RbClass("Color", "Object", "Unity")]
     public static class Color
     {
-        public static RbValue CreateColor(RbState state, float rVal, float gVal, float bVal, float aVal)
+        public static RbValue CreateColor(RbState state, double rVal, double gVal, double bVal, double aVal)
         {
             try
             {
                 var stub = new ColorData(state)
                 {
-                    R = rVal / 255.0f,
-                    G = gVal / 255.0f,
-                    B = bVal / 255.0f,
-                    A = aVal / 255.0f,
+                    RedValue = rVal,
+                    GreenValue = gVal,
+                    BlueValue = bVal,
+                    AlphaValue = aVal,
                 };
 
                 var colorCls = RubyScriptManager.Instance.GetClassUnderUnityModule("Color");
@@ -53,7 +58,7 @@ namespace RGSSUnity.RubyClasses
                 var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
                 var aVal = a.IsInt ? a.ToIntUnchecked() : a.ToFloatUnchecked();
 
-                var res = CreateColor(state, (float)rVal, (float)gVal, (float)bVal, (float)aVal);
+                var res = CreateColor(state, rVal, gVal, bVal, aVal);
                 return res;
             }
             catch (Exception ex)
@@ -71,14 +76,11 @@ namespace RGSSUnity.RubyClasses
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var aVal = a.IsInt ? a.ToIntUnchecked() : a.ToFloatUnchecked();
 
-            // Stored normalized 0..1 (consumed as a Godot Color). MUST divide by 255 to
-            // match the constructor (CreateColor) and the per-component setters; storing
-            // raw 0..255 here made every color.set(...) render 255x too bright.
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.R = (float)rVal / 255.0f;
-            colorData.G = (float)gVal / 255.0f;
-            colorData.B = (float)bVal / 255.0f;
-            colorData.A = (float)aVal / 255.0f;
+            colorData.RedValue = rVal;
+            colorData.GreenValue = gVal;
+            colorData.BlueValue = bVal;
+            colorData.AlphaValue = aVal;
             return state.RbNil;
         }
 
@@ -86,7 +88,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetR(RbState state, RbValue self)
         {
             var colorData = self.GetRDataObject<ColorData>();
-            return (colorData.R * 255.0f).ToValue(state);
+            return colorData.RedValue.ToValue(state);
         }
 
         [RbInstanceMethod("red=")]
@@ -94,7 +96,7 @@ namespace RGSSUnity.RubyClasses
         {
             var rVal = r.IsInt ? r.ToIntUnchecked() : r.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.R = (float)rVal / 255.0f;
+            colorData.RedValue = rVal;
             return state.RbNil;
         }
 
@@ -102,7 +104,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetG(RbState state, RbValue self)
         {
             var colorData = self.GetRDataObject<ColorData>();
-            return (colorData.G * 255.0f).ToValue(state);
+            return colorData.GreenValue.ToValue(state);
         }
 
         [RbInstanceMethod("green=")]
@@ -110,7 +112,7 @@ namespace RGSSUnity.RubyClasses
         {
             var gVal = g.IsInt ? g.ToIntUnchecked() : g.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.G = (float)gVal / 255.0f;
+            colorData.GreenValue = gVal;
             return state.RbNil;
         }
 
@@ -118,7 +120,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetB(RbState state, RbValue self)
         {
             var colorData = self.GetRDataObject<ColorData>();
-            return (colorData.B * 255.0f).ToValue(state);
+            return colorData.BlueValue.ToValue(state);
         }
 
         [RbInstanceMethod("blue=")]
@@ -126,7 +128,7 @@ namespace RGSSUnity.RubyClasses
         {
             var bVal = b.IsInt ? b.ToIntUnchecked() : b.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.B = (float)bVal / 255.0f;
+            colorData.BlueValue = bVal;
             return state.RbNil;
         }
 
@@ -134,7 +136,7 @@ namespace RGSSUnity.RubyClasses
         public static RbValue GetA(RbState state, RbValue self)
         {
             var colorData = self.GetRDataObject<ColorData>();
-            return (colorData.A * 255.0f).ToValue(state);
+            return colorData.AlphaValue.ToValue(state);
         }
 
         [RbInstanceMethod("alpha=")]
@@ -142,7 +144,7 @@ namespace RGSSUnity.RubyClasses
         {
             var aVal = a.IsInt ? a.ToIntUnchecked() : a.ToFloatUnchecked();
             var colorData = self.GetRDataObject<ColorData>();
-            colorData.A = (float)aVal / 255.0f;
+            colorData.AlphaValue = aVal;
             return state.RbNil;
         }
     }

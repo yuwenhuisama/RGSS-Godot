@@ -1,0 +1,14 @@
+max-buy	0	0
+max-buy	39	0
+max-buy	40	1
+max-buy	80	2
+max-buy	40000	99
+buy-two	120	2	2
+sell-one	140	1	20
+full-inventory	0
+back	true	A	1
+add	true	AC	2
+add-max	true	ACD	3
+over-max	false	ACD	3
+empty-back	false		0
+restore	true	AB	2

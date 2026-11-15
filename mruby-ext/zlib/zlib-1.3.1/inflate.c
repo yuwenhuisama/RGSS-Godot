@@ -1407,11 +1407,10 @@ int ZEXPORT inflateSync(z_streamp strm) {
 
     /* return no joy or set up to restart inflate() on a new block */
     if (state->have != 4) return Z_DATA_ERROR;
-    if (state->flags == -1)
-        state->wrap = 0;    /* if no header yet, treat as raw */
-    else
-        state->wrap &= ~4;  /* no point in computing a check value now */
-    flags = state->flags;
+    /* RGSS300 retains wrapper/check validation after sync, as zlib 1.2.5
+       did. The modern raw/no-check recovery accepts a stream whose original
+       checksum the reference runtime rejects. */
+    flags = state->flags == -1 ? 0 : state->flags;
     in = strm->total_in;  out = strm->total_out;
     inflateReset(strm);
     strm->total_in = in;  strm->total_out = out;

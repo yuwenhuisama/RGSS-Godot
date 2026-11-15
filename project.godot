@@ -21,7 +21,6 @@ window/size/viewport_height=416
 window/size/window_width_override=1088
 window/size/window_height_override=832
 window/stretch/mode="viewport"
-window/stretch/aspect="keep"
 window/stretch/scale_mode="integer"
 
 [dotnet]

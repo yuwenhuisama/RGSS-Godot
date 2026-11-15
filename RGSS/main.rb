@@ -81,7 +81,7 @@ begin
       msgbox "RGSS3 scripts loaded successfully."
       require 'patch_rmva' if Object.const_defined?(:DataManager) && Object.const_defined?(:Cache) && Object.const_defined?(:SceneManager)
       msgbox "Running RGSS3 main loop..."
-      $rgss_main_callback.call if $rgss_main_callback
+      run_rgss_main_callback
     rescue Exception => e
       Unity.on_top_exception(format_exc_string(e))
     ensure

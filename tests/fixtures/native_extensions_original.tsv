@@ -1,0 +1,24 @@
+zlib-roundtrip	native payload
+zlib-crc32	3421780262
+zlib-adler32	300286872
+zlib-crc32-seed	3421780262
+zlib-adler32-seed	300286872
+zlib-empty	0
+zlib-level0	7801010e00f1ff6e6174697665207061796c6f616429f10592
+zlib-level9	78dacb4b2cc92c4b552848acccc94f4c010029f10592
+zlib-truncated	error	Zlib::BufError
+zlib-corrupt	error	Zlib::DataError
+zlib-invalid-level	error	Zlib::StreamError
+regexp-lookbehind	b
+regexp-captures	a,b
+regexp-backref	12-ab
+regexp-scan	a:1,b:2
+regexp-position	2
+regexp-ignorecase	AB
+glob-star	a.txt,b.rb,nested
+glob-recursive	a.txt,nested/c.txt
+glob-brace	a.txt,b.rb
+glob-dotmatch	.hidden.txt,a.txt
+symlink-file	false
+symlink-missing	false
+glob-start-recursive	a.txt,nested/c.txt

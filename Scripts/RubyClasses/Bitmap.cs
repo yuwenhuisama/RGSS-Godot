@@ -14,10 +14,15 @@ public static class Bitmap
     [RbClassMethod("new_wh")]
     public static RbValue NewWithWidthAndHeight(RbState state, RbValue self, RbValue width, RbValue height)
     {
-        var w = Math.Max(1, (int)width.ToIntUnchecked());
-        var h = Math.Max(1, (int)height.ToIntUnchecked());
+        var w = (int)width.ToIntUnchecked();
+        var h = (int)height.ToIntUnchecked();
+        if (w <= 0 || h <= 0)
+        {
+            state.RaiseRGSSError("failed to create bitmap");
+            return state.RbNil;
+        }
         var image = Image.Create(w, h, false, Image.Format.Rgba8);
-        image.Fill(Colors.Transparent);
+        image.Fill(new Godot.Color(0, 0, 0, 0));
         return CreateBitmapObject(state, image);
     }
 
@@ -25,13 +30,10 @@ public static class Bitmap
     public static RbValue NewWithFileName(RbState state, RbValue self, RbValue filename)
     {
         var relativePath = filename.ToStringUnchecked()!;
-        var path = RMProjectPath.Resolve(relativePath);
-
-        if (!Path.HasExtension(path)) path += ".png";
+        var path = ResolveImagePath(RMProjectPath.Resolve(relativePath));
         if (!File.Exists(path) && !Path.IsPathRooted(relativePath) && !string.IsNullOrEmpty(GlobalConfig.Instance.RtpPath))
         {
-            path = Path.Combine(GlobalConfig.Instance.RtpPath, relativePath);
-            if (!Path.HasExtension(path)) path += ".png";
+            path = ResolveImagePath(Path.Combine(GlobalConfig.Instance.RtpPath, relativePath));
         }
 
         if (!File.Exists(path))
@@ -62,8 +64,37 @@ public static class Bitmap
     public static RbValue FileExists(RbState state, RbValue self, RbValue filename)
     {
         var relativePath = filename.ToStringUnchecked()!;
-        var path = RMProjectPath.Resolve(relativePath);
+        var path = ResolveImagePath(RMProjectPath.Resolve(relativePath));
         return File.Exists(path).ToValue(state);
+    }
+
+    private static string ResolveImagePath(string path)
+    {
+        if (!Path.HasExtension(path)) path += ".png";
+        if (File.Exists(path) || OperatingSystem.IsWindows()) return path;
+
+        // RMVA projects use Windows filename matching, including stock Iconset
+        // requests for the RTP's IconSet.png on case-sensitive filesystems.
+        var current = Path.GetPathRoot(path)!;
+        foreach (var part in path[current.Length..].Split(Path.DirectorySeparatorChar))
+        {
+            var exact = Path.Combine(current, part);
+            if (File.Exists(exact) || Directory.Exists(exact))
+            {
+                current = exact;
+                continue;
+            }
+            if (!Directory.Exists(current)) return path;
+            string? match = null;
+            foreach (var entry in Directory.EnumerateFileSystemEntries(current))
+            {
+                if (!string.Equals(Path.GetFileName(entry), part, StringComparison.OrdinalIgnoreCase)) continue;
+                if (match == null || string.CompareOrdinal(entry, match) < 0) match = entry;
+            }
+            if (match == null) return path;
+            current = match;
+        }
+        return current;
     }
 
     [RbInstanceMethod("dispose")]
@@ -171,7 +202,7 @@ public static class Bitmap
         var rect = ClampRect((int)x.ToIntUnchecked(), (int)y.ToIntUnchecked(), (int)w.ToIntUnchecked(), (int)h.ToIntUnchecked(), data.Width, data.Height);
         if (rect.Size.X > 0 && rect.Size.Y > 0)
         {
-            data.Image.FillRect(rect, Colors.Transparent);
+            data.Image.FillRect(rect, new Godot.Color(0, 0, 0, 0));
             data.MarkDirty();
         }
 
@@ -182,7 +213,7 @@ public static class Bitmap
     public static RbValue Clear(RbState state, RbValue self)
     {
         var data = GetBitmapData(self);
-        data.Image.Fill(Colors.Transparent);
+        data.Image.Fill(new Godot.Color(0, 0, 0, 0));
         data.MarkDirty();
         return state.RbNil;
     }
@@ -221,16 +252,40 @@ public static class Bitmap
     public static RbValue HueChange(RbState state, RbValue self, RbValue hue)
     {
         var data = GetBitmapData(self);
-        var shift = (float)(hue.ToIntUnchecked() % 360) / 360.0f;
+        var shift = (int)hue.ToIntUnchecked();
+        if (shift == 0) return state.RbNil;
 
         for (var py = 0; py < data.Height; py++)
         {
             for (var px = 0; px < data.Width; px++)
             {
                 var color = data.Image.GetPixel(px, py);
-                var nextHue = color.H + shift;
-                nextHue -= MathF.Floor(nextHue);
-                data.Image.SetPixel(px, py, Godot.Color.FromHsv(nextHue, color.S, color.V, color.A));
+                var r = (int)MathF.Round(color.R * 255);
+                var g = (int)MathF.Round(color.G * 255);
+                var b = (int)MathF.Round(color.B * 255);
+                var maximum = Math.Max(r, Math.Max(g, b));
+                var minimum = Math.Min(r, Math.Min(g, b));
+                var delta = maximum - minimum;
+                var lightness = (maximum + minimum) / 2;
+                var saturation = delta == 0 ? 0 : 255 * delta / (maximum + minimum <= 255
+                    ? maximum + minimum : 510 - maximum - minimum);
+                var baseHue = delta == 0 ? 0 : maximum == r ? 60.0 * (g - b) / delta
+                    : maximum == g ? 120.0 + 60.0 * (b - r) / delta : 240.0 + 60.0 * (r - g) / delta;
+                var nextHue = (((int)Math.Round(baseHue, MidpointRounding.AwayFromZero) + shift) % 360 + 360) % 360;
+                var amplitude = (lightness <= 128 ? lightness : 255 - lightness) * saturation / 255;
+                var low = lightness - amplitude;
+                var high = lightness + amplitude;
+                var ramp = 2.0 * amplitude * (nextHue % 60) / 60;
+                var converted = (nextHue / 60) switch
+                {
+                    0 => new Godot.Color(high / 255f, (int)(low + ramp) / 255f, low / 255f, color.A),
+                    1 => new Godot.Color((int)(high - ramp) / 255f, high / 255f, low / 255f, color.A),
+                    2 => new Godot.Color(low / 255f, high / 255f, (int)(low + ramp) / 255f, color.A),
+                    3 => new Godot.Color(low / 255f, (int)(high - ramp) / 255f, high / 255f, color.A),
+                    4 => new Godot.Color((int)(low + ramp) / 255f, low / 255f, high / 255f, color.A),
+                    _ => new Godot.Color(high / 255f, low / 255f, (int)(high - ramp) / 255f, color.A),
+                };
+                data.Image.SetPixel(px, py, converted);
             }
         }
 
@@ -242,7 +297,7 @@ public static class Bitmap
     public static RbValue Blur(RbState state, RbValue self)
     {
         var data = GetBitmapData(self);
-        var source = data.Image.GetRegion(new Rect2I(0, 0, data.Width, data.Height));
+        using var source = data.Image.GetRegion(new Rect2I(0, 0, data.Width, data.Height));
 
         for (var py = 0; py < data.Height; py++)
         {
@@ -277,11 +332,11 @@ public static class Bitmap
     public static RbValue RadialBlur(RbState state, RbValue self, RbValue angle, RbValue division)
     {
         var data = GetBitmapData(self);
-        var angleValue = (float)angle.ToIntUnchecked();
-        var divisions = Math.Max(1, (int)division.ToIntUnchecked());
-        var source = data.Image.GetRegion(new Rect2I(0, 0, data.Width, data.Height));
-        var centerX = (data.Width - 1) / 2.0f;
-        var centerY = (data.Height - 1) / 2.0f;
+        var angleValue = Math.Clamp((float)angle.ToIntUnchecked(), 0, 359);
+        var divisions = Math.Clamp((int)division.ToIntUnchecked(), 2, 100);
+        using var source = data.Image.GetRegion(new Rect2I(0, 0, data.Width, data.Height));
+        var centerX = data.Width / 2.0f;
+        var centerY = data.Height / 2.0f;
 
         for (var py = 0; py < data.Height; py++)
         {
@@ -290,19 +345,27 @@ public static class Bitmap
                 var accum = new Godot.Color(0, 0, 0, 0);
                 for (var i = 0; i < divisions; i++)
                 {
-                    var radians = MathF.PI * 2.0f * ((angleValue / divisions) * i) / 360.0f;
+                    var radians = MathF.PI * 2.0f * (-angleValue / 2 + (angleValue / (divisions - 1)) * i) / 360.0f;
                     var dx = px - centerX;
                     var dy = py - centerY;
-                    var sx = Math.Clamp((int)MathF.Round(centerX + (dx * MathF.Cos(radians)) - (dy * MathF.Sin(radians))), 0, data.Width - 1);
-                    var sy = Math.Clamp((int)MathF.Round(centerY + (dx * MathF.Sin(radians)) + (dy * MathF.Cos(radians))), 0, data.Height - 1);
+                    var sx = (int)MathF.Round(centerX + (dx * MathF.Cos(radians)) - (dy * MathF.Sin(radians)));
+                    var sy = (int)MathF.Round(centerY + (dx * MathF.Sin(radians)) + (dy * MathF.Cos(radians)));
+                    sx = (sx % (2 * data.Width) + 2 * data.Width) % (2 * data.Width);
+                    sy = (sy % (2 * data.Height) + 2 * data.Height) % (2 * data.Height);
+                    if (sx >= data.Width) sx = 2 * data.Width - sx - 1;
+                    if (sy >= data.Height) sy = 2 * data.Height - sy - 1;
                     var sample = source.GetPixel(sx, sy);
-                    accum.R += sample.R;
-                    accum.G += sample.G;
-                    accum.B += sample.B;
-                    accum.A += sample.A;
+                    accum.R += MathF.Round(sample.R * 255);
+                    accum.G += MathF.Round(sample.G * 255);
+                    accum.B += MathF.Round(sample.B * 255);
+                    accum.A += MathF.Round(sample.A * 255);
                 }
 
-                data.Image.SetPixel(px, py, new Godot.Color(accum.R / divisions, accum.G / divisions, accum.B / divisions, accum.A / divisions));
+                data.Image.SetPixel(px, py, new Godot.Color(
+                    MathF.Truncate(accum.R / divisions) / 255,
+                    MathF.Truncate(accum.G / divisions) / 255,
+                    MathF.Truncate(accum.B / divisions) / 255,
+                    MathF.Truncate(accum.A / divisions) / 255));
             }
         }
 
@@ -319,6 +382,14 @@ public static class Bitmap
         if (str.Length == 0)
             return state.RbNil;
 
+        if (OperatingSystem.IsWindows())
+        {
+            DrawNativeText(data.Image, fontData, str, new Rect2I((int)x.ToIntUnchecked(), (int)y.ToIntUnchecked(),
+                Math.Max(0, (int)w.ToIntUnchecked()), Math.Max(0, (int)h.ToIntUnchecked())), (int)align.ToIntUnchecked());
+            data.MarkDirty();
+            return state.RbNil;
+        }
+
         DrawTextToImage(
             data.Image,
             (int)x.ToIntUnchecked(), (int)y.ToIntUnchecked(),
@@ -332,6 +403,55 @@ public static class Bitmap
 
         data.MarkDirty();
         return state.RbNil;
+    }
+
+    private static void DrawNativeText(Image destination, FontData font, string text, Rect2I rect, int align)
+    {
+        if (rect.Size.X == 0 || rect.Size.Y == 0)
+            return;
+        using var raster = FontMetrics.Rasterize(font, text, rect.Size.X, out var measured, out var rawCoverage);
+        using var coverageMap = rawCoverage;
+        var width = measured.X + (font.Outline ? 2 : 0);
+        var originX = rect.Position.X + Math.Max(0, align == 1 ? (rect.Size.X - width + (font.Outline ? 1 : 0)) / 2 : align == 2 ? rect.Size.X - width : 0);
+        var originY = rect.Position.Y + Math.Max(0, (rect.Size.Y - measured.Y - (font.Outline ? 2 : 0)) / 2);
+        var color = ToGodotColor(font.Color);
+        var outlineColor = ToGodotColor(font.OutlineColor);
+        outlineColor.A *= color.A;
+        if (font.Shadow)
+        for (var y = 0; y < Math.Min(raster.GetHeight(), rect.Size.Y - (font.Outline ? 1 : 0)); y++)
+        for (var x = 0; x < raster.GetWidth(); x++)
+        {
+            var coverage = raster.GetPixel(x, y).A;
+            BlendTextPixel(destination, originX + x + 1, originY + y + 1, rect, new Godot.Color(0, 0, 0, color.A * coverage));
+        }
+        if (font.Outline)
+        for (var oy = -1; oy <= 1; oy += 2)
+        for (var passX = 0; passX < 2; passX++)
+        for (var y = 0; y < Math.Min(raster.GetHeight(), rect.Size.Y - 1); y++)
+        for (var x = 0; x < raster.GetWidth(); x++)
+        {
+            var ox = oy < 0 ? passX * 2 - 1 : 1 - passX * 2;
+            var coverage = raster.GetPixel(x, y).A;
+            var edgeColor = outlineColor;
+            var grayLevel = (int)Math.Round(coverageMap.GetPixel(x, y).R * 255.0f);
+            edgeColor.A = (int)Math.Round(outlineColor.A * grayLevel / 64.0f * 255.0f) / 255.0f;
+            BlendTextPixel(destination, originX + x + ox, originY + y + oy, rect, edgeColor);
+        }
+        for (var y = 0; y < Math.Min(raster.GetHeight(), rect.Size.Y - (font.Outline ? 1 : 0)); y++)
+        for (var x = 0; x < raster.GetWidth(); x++)
+        {
+            var pixel = color;
+            pixel.A *= raster.GetPixel(x, y).A;
+            BlendTextPixel(destination, originX + x, originY + y, rect, pixel);
+        }
+    }
+
+    private static void BlendTextPixel(Image destination, int x, int y, Rect2I clip, Godot.Color color)
+    {
+        if (color.A <= 0 || !clip.HasPoint(new Vector2I(x, y)) || x < 0 || y < 0 || x >= destination.GetWidth() || y >= destination.GetHeight())
+            return;
+        var original = destination.GetPixel(x, y);
+        destination.SetPixel(x, y, AlphaOver(color, original));
     }
 
     // CPU text rasterization onto a Godot.Image via the TextServer FreeType glyph
@@ -479,7 +599,7 @@ public static class Bitmap
         var start = ToGodotColor(color1.GetRDataObject<ColorData>());
         var end = ToGodotColor(color2.GetRDataObject<ColorData>());
         var isVertical = vertical.IsTrue;
-        var denom = Math.Max(1, (isVertical ? rect.Size.Y : rect.Size.X) - 1);
+        var denom = Math.Max(1, (int)(isVertical ? h.ToIntUnchecked() : w.ToIntUnchecked()) - 1);
 
         for (var oy = 0; oy < rect.Size.Y; oy++)
         {
@@ -499,9 +619,8 @@ public static class Bitmap
     {
         var fontData = GetFontData(GetBitmapData(self));
         var textValue = Utf8String(text);
-        var width = textValue.Length * Math.Max(1, fontData.Size);
-        var height = Math.Max(1, fontData.Size);
-        return Rect.CreateRect(state, 0, 0, width, height);
+        var size = FontMetrics.Measure(fontData, textValue);
+        return Rect.CreateRect(state, 0, 0, size.X, size.Y);
     }
 
     // mruby strings are UTF-8 byte buffers; RbValue.ToStringUnchecked decodes them
@@ -517,7 +636,7 @@ public static class Bitmap
         return bytes.Length == 0 ? string.Empty : System.Text.Encoding.UTF8.GetString(bytes);
     }
 
-    private static RbValue CreateBitmapObject(RbState state, Image image)
+    internal static RbValue CreateBitmapObject(RbState state, Image image)
     {
         if (image.GetFormat() != Image.Format.Rgba8)
             image.Convert(Image.Format.Rgba8);
@@ -588,9 +707,7 @@ public static class Bitmap
                     continue;
 
                 var source = src.GetPixel(sx, sy);
-                source.A *= opacity;
-                if (source.A <= 0.0f)
-                    continue;
+                source.A = ((int)MathF.Round(source.A * 255) * (int)MathF.Round(opacity * 255) / 255) / 255.0f;
 
                 dest.SetPixel(dx, dy, AlphaOver(source, dest.GetPixel(dx, dy)));
             }
@@ -606,19 +723,38 @@ public static class Bitmap
         if (regionRect.Size.X <= 0 || regionRect.Size.Y <= 0)
             return;
 
-        var region = src.GetRegion(regionRect);
-        region.Resize(Math.Max(1, destRect.Width), Math.Max(1, destRect.Height), Image.Interpolation.Bilinear);
-        BlendImage(dest, region, 0, 0, region.GetWidth(), region.GetHeight(), destRect.X, destRect.Y, opacity);
+        var stepX = ((long)regionRect.Size.X << 16) / destRect.Width;
+        var stepY = ((long)regionRect.Size.Y << 16) / destRect.Height;
+        for (var y = 0; y < destRect.Height; y++)
+        {
+            var dy = destRect.Y + y;
+            if (dy < 0 || dy >= dest.GetHeight()) continue;
+            var sy = regionRect.Position.Y + (int)((y * stepY) >> 16);
+            for (var x = 0; x < destRect.Width; x++)
+            {
+                var dx = destRect.X + x;
+                if (dx < 0 || dx >= dest.GetWidth()) continue;
+                var sx = regionRect.Position.X + (int)((x * stepX) >> 16);
+                var source = src.GetPixel(sx, sy);
+                source.A = ((int)MathF.Round(source.A * 255) * (int)MathF.Round(opacity * 255) / 255) / 255.0f;
+                dest.SetPixel(dx, dy, AlphaOver(source, dest.GetPixel(dx, dy)));
+            }
+        }
     }
 
     private static Godot.Color AlphaOver(Godot.Color source, Godot.Color dest)
     {
-        var invA = 1.0f - source.A;
+        var sourceAlpha = (int)MathF.Round(source.A * 255);
+        var destinationAlpha = (int)MathF.Round(dest.A * 255);
+        if (destinationAlpha == 0) return source;
+        if (sourceAlpha == 0) return dest;
+        var numerator = 255 * sourceAlpha + destinationAlpha * (255 - sourceAlpha);
+        var weight = 65025 * sourceAlpha / numerator + 1;
         return new Godot.Color(
-            Clamp01((source.R * source.A) + (dest.R * invA)),
-            Clamp01((source.G * source.A) + (dest.G * invA)),
-            Clamp01((source.B * source.A) + (dest.B * invA)),
-            Clamp01(source.A + (dest.A * invA)));
+            (((int)MathF.Round(source.R * 255) * weight + (int)MathF.Round(dest.R * 255) * (256 - weight)) >> 8) / 255.0f,
+            (((int)MathF.Round(source.G * 255) * weight + (int)MathF.Round(dest.G * 255) * (256 - weight)) >> 8) / 255.0f,
+            (((int)MathF.Round(source.B * 255) * weight + (int)MathF.Round(dest.B * 255) * (256 - weight)) >> 8) / 255.0f,
+            (numerator / 255) / 255.0f);
     }
 
     private static Rect2I ClampRect(int x, int y, int w, int h, int maxW, int maxH)
@@ -646,9 +782,9 @@ public static class Bitmap
     {
         t = Clamp01(t);
         return new Godot.Color(
-            left.R + ((right.R - left.R) * t),
-            left.G + ((right.G - left.G) * t),
-            left.B + ((right.B - left.B) * t),
-            left.A + ((right.A - left.A) * t));
+            (MathF.Round(left.R * 255) + MathF.Truncate((MathF.Round(right.R * 255) - MathF.Round(left.R * 255)) * t)) / 255,
+            (MathF.Round(left.G * 255) + MathF.Truncate((MathF.Round(right.G * 255) - MathF.Round(left.G * 255)) * t)) / 255,
+            (MathF.Round(left.B * 255) + MathF.Truncate((MathF.Round(right.B * 255) - MathF.Round(left.B * 255)) * t)) / 255,
+            (MathF.Round(left.A * 255) + MathF.Truncate((MathF.Round(right.A * 255) - MathF.Round(left.A * 255)) * t)) / 255);
     }
 }

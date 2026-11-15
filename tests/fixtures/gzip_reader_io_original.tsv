@@ -1,0 +1,11 @@
+partial-buffer	true,6162,2
+partial-zero	true,0,0
+partial-eof	0,6,true
+read-eof	nil,"",""
+ungetbyte	97,0,90,620a63640a
+ungetc	4294967295,5859620a63640a
+lines-enumerator	61620a;63640a,2,true
+readbyte-eof	EOFError
+ungetc-before-start	4294967294,X,4294967295,Y,0
+ungetc-three	4294967294,XY,0
+ungetbyte-before-start	4294967295,90,0

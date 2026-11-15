@@ -1,0 +1,6 @@
+escape-success	1	Scene_Map	false	0	0	562
+escape-failure		Scene_Battle	true	0	0	562
+abort	1	Scene_Map	false	0	0	562
+allowed-defeat	2	Scene_Map	false	0	0	1
+gameover	2	Scene_Gameover	false	0	0	0
+victory	0	Scene_Map	false	10	6	562

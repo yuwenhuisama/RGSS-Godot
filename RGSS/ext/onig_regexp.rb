@@ -11,8 +11,8 @@ class OnigRegexp
   end
 
   # ISO 15.2.15.6.3
-  def self.last_match
-    @last_match
+  class << self
+    alias_method :last_match, :native_last_match
   end
 
   def self.last_match=(match)
@@ -32,10 +32,7 @@ class OnigRegexp
   end
 
   # ISO 15.2.15.7.5
-  def =~(str)
-    m = self.match(str)
-    m ? m.begin(0) : nil
-  end
+  alias_method :=~, :native_match_index
 
   # ISO 15.2.15.7.8
   attr_reader :source
@@ -43,13 +40,7 @@ end
 
 class String
   # ISO 15.2.10.5.5
-  def =~(a)
-    begin
-      (a.class.to_s == 'String' ?  Regexp.new(a.to_s) : a) =~ self
-    rescue
-      false
-    end
-  end
+  alias_method :=~, :onig_regexp_match_index
 
   # ISO 15.2.10.5.27
   def match(re, pos=0, &block)
@@ -144,6 +135,9 @@ class String
     result
   end
 
+  alias_method :old_slice_bang, :slice!
+  alias_method :slice!, :onig_regexp_slice_bang
+
   alias_method :old_index, :index
 
   def index(pattern, pos=0)
@@ -162,6 +156,7 @@ class String
       self.old_index(pattern, pos)
     end
   end
+  alias_method :index, :onig_regexp_index
 end
 
 module Kernel

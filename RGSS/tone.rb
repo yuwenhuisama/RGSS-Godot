@@ -16,11 +16,12 @@ class Tone
     elsif args.size == 3
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b = args
-      @__handler__ = Unity::Tone.new_rgbg r, g, b, 0
+      # RGSS300 constructor clamps red/green/blue to -255..255, gray to 0..255.
+      @__handler__ = Unity::Tone.new_rgbg r.clamp(-255, 255), g.clamp(-255, 255), b.clamp(-255, 255), 0
     elsif args.size == 4
       check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
       r, g, b, gray = args
-      @__handler__ = Unity::Tone.new_rgbg r, g, b, gray
+      @__handler__ = Unity::Tone.new_rgbg r.clamp(-255, 255), g.clamp(-255, 255), b.clamp(-255, 255), gray.clamp(0, 255)
     else
       raise ArgumentError.new("Invalid number of arguments")
     end

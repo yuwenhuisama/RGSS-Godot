@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Rect
@@ -14,8 +14,8 @@ class Rect
       r, = args
       @__handler__, = r
     elsif args.size == 4
-      check_arguments(args, [Integer, Integer, Integer, Integer])
-      x, y, w, h = args
+      check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
+      x, y, w, h = args.map { |value| value.to_i }
       @__handler__ = Unity::Rect.new_xywh(x, y, w, h)
     else
       raise ArgumentError.new("Invalid number of arguments")
@@ -29,9 +29,9 @@ class Rect
 
       @__handler__.set_xywh(rect.x, rect.y, rect.width, rect.height)
     elsif args.size == 4
-      check_arguments(args, [Integer, Integer, Integer, Integer])
+      check_arguments(args, [[Integer, Float], [Integer, Float], [Integer, Float], [Integer, Float]])
 
-      @__handler__.set_xywh(*args)
+      @__handler__.set_xywh(*args.map { |value| value.to_i })
     else
       raise ArgumentError.new("Invalid number of arguments")
     end
@@ -73,8 +73,8 @@ class Rect
     end
 
     define_method("#{prop}=") do |value|
-      check_type(value, Integer)
-      @__handler__.send("#{prop}=", value)
+      check_type(value, [Integer, Float])
+      @__handler__.send("#{prop}=", value.to_i)
     end
   end
 

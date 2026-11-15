@@ -50,7 +50,9 @@ public sealed class GlobalConfig
 
                 return new GlobalConfig
                 {
-                    RtpPath = config.RtpPath ?? string.Empty,
+                    RtpPath = string.IsNullOrWhiteSpace(config.RtpPath)
+                        ? string.Empty
+                        : Path.GetFullPath(config.RtpPath, Path.GetDirectoryName(Path.GetFullPath(path)) ?? Directory.GetCurrentDirectory()),
                     ProjectPath = config.ProjectPath ?? string.Empty,
                     LegacyMode = config.LegacyMode,
                     LegacyModeWidth = config.LegacyModeWidth,

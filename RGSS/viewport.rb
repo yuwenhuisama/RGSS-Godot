@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Viewport
@@ -50,30 +50,33 @@ class Viewport
   end
 
   def color
-    Color.new(@__handler__.color)
+    @color ||= Color.new(@__handler__.color)
   end
 
   def color=(value)
     check_arguments([value], [Color])
     @__handler__.color = value.__handler__
+    @color = value
   end
 
   def tone
-    Tone.new(@__handler__.tone)
+    @tone ||= Tone.new(@__handler__.tone)
   end
 
   def tone=(tone)
     check_arguments([tone], [Tone])
     @__handler__.tone = tone.__handler__
+    @tone = tone
   end
 
   def rect
-    Rect.new(@__handler__.rect)
+    @rect ||= Rect.new(@__handler__.rect)
   end
 
   def rect=(rect)
     check_arguments([rect], [Rect])
     @__handler__.rect = rect.__handler__
+    @rect = rect
   end
 
   def eql?(other)
@@ -95,14 +98,8 @@ class Viewport
     end
   end
 
-  DEFAULT_VIEWPORT = Viewport.new(0, 0, Graphics.width, Graphics.height)
-  # Windows/sprites created without an explicit viewport land on DEFAULT_VIEWPORT. This
-  # port composites each RGSS viewport as a separate layer ordered by viewport.z, so a
-  # window's own z only orders it WITHIN its viewport -- cross-viewport order is purely
-  # viewport.z. Spritesets use viewports at z 0/50/100 (battleback/enemies on z=0), so a
-  # default-viewport at z=0 (registered first, tie broken by add-order) renders BENEATH
-  # the opaque battleback and all spriteset layers -> every battle window vanishes. Put
-  # the default viewport above spriteset viewports (matches RGSS3 where no-viewport UI
-  # sits on top, and Scene_Base's own @viewport uses z=200).
-  DEFAULT_VIEWPORT.z = 200
+  DEFAULT_VIEWPORT = Viewport.new(Unity::Viewport.new_default)
 end
+
+require 'resource_lifecycle'
+ResourceLifecycle.guard(Viewport)

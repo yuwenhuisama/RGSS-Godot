@@ -56,7 +56,7 @@ public static class Sprite
     public static RbValue Flash(RbState state, RbValue self, RbValue color, RbValue duration)
     {
         var data = self.GetRDataObject<SpriteData>();
-        data.FlashDuration = Math.Max(0, (int)duration.ToIntUnchecked());
+        data.FlashDuration = Math.Max(1, (int)duration.ToIntUnchecked());
         data.FlashRemain = data.FlashDuration;
         data.FlashColor = color.IsNil ? null : color.GetRDataObject<ColorData>();
         return state.RbNil;
@@ -76,7 +76,7 @@ public static class Sprite
             data.FlashColor = null;
         }
 
-        if (data.WaveAmp != 0.0f && Math.Abs(data.WaveLength) > float.Epsilon)
+        if (Math.Abs(data.WaveLength) > float.Epsilon)
         {
             data.WavePhase += data.WaveSpeed / data.WaveLength;
             data.WavePhase %= 360.0f;
@@ -356,7 +356,7 @@ public static class Sprite
     [RbInstanceMethod("opacity=")]
     public static RbValue SetOpacity(RbState state, RbValue self, RbValue value)
     {
-        self.GetRDataObject<SpriteData>().Opacity = Math.Clamp((int)value.ToIntUnchecked(), 0, 255);
+        self.GetRDataObject<SpriteData>().Opacity = Math.Clamp(value.IsFloat ? (int)value.ToFloatUnchecked() : (int)value.ToIntUnchecked(), 0, 255);
         return state.RbNil;
     }
 
@@ -434,8 +434,8 @@ public static class Sprite
         => value.IsFloat ? Convert.ToSingle(value.ToFloatUnchecked()) : Convert.ToSingle(value.ToIntUnchecked());
 
     private static int GetSourceWidth(SpriteData data)
-        => data.SrcRect?.Width > 0 ? data.SrcRect.Width : data.Bitmap?.Width ?? 0;
+        => data.SrcRect?.Width ?? data.Bitmap?.Width ?? 0;
 
     private static int GetSourceHeight(SpriteData data)
-        => data.SrcRect?.Height > 0 ? data.SrcRect.Height : data.Bitmap?.Height ?? 0;
+        => data.SrcRect?.Height ?? data.Bitmap?.Height ?? 0;
 }

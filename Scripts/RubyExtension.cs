@@ -11,7 +11,10 @@ namespace RGSSUnity.RubyClasses
             // MRuby.Library >= 0.2.0 strong-roots the C# data object itself (GCHandle.Alloc
             // inside NewObjectWithCSharpDataObject) and tracks it in a per-state registry it
             // drains on Ruby.Close. No manual keeper is needed to keep `data` alive anymore.
-            var obj = cls.NewObjectWithCSharpDataObject(RubyData.RDataName, data, args);
+            var obj = data is BitmapData
+                ? cls.NewObjectWithCSharpDataObject(RubyData.RDataName + "Bitmap", data,
+                    (_, owned) => ((BitmapData)owned!).ReleaseResources(), args)
+                : cls.NewObjectWithCSharpDataObject(RubyData.RDataName, data, args);
             return obj;
         }
     }
@@ -21,7 +24,7 @@ namespace RGSSUnity.RubyClasses
         public static T GetRDataObject<T>(this RbValue value)
             where T : RubyData
         {
-            var data = value.GetDataObject<T>(RubyData.RDataName)!;
+            var data = value.GetDataObject<T>(typeof(T) == typeof(BitmapData) ? RubyData.RDataName + "Bitmap" : RubyData.RDataName)!;
             return data;
         }
     }
@@ -29,6 +32,8 @@ namespace RGSSUnity.RubyClasses
     public abstract class RubyData
     {
         public const string RDataName = "RData";
+        private static long nextCreationSequence;
+        public ulong CreationSequence { get; } = (ulong)System.Threading.Interlocked.Increment(ref nextCreationSequence);
 
         protected RubyData(RbState state)
         {

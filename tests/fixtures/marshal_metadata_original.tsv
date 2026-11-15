@@ -1,0 +1,10 @@
+symbol-link	true
+hash-link	true
+hash-symbol-key	1,2
+encoding	UTF-8	UTF-8	e4b8ad
+encoding-copy	UTF-8	UTF-8	e4b8ad
+encoding	ASCII-8BIT	ASCII-8BIT	e4b8ad
+encoding-copy	ASCII-8BIT	ASCII-8BIT	e4b8ad
+encoding	US-ASCII	US-ASCII	616263
+encoding-copy	US-ASCII	US-ASCII	616263
+encoding	Windows-31J	ArgumentError

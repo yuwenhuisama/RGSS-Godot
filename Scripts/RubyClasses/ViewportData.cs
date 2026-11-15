@@ -18,7 +18,9 @@ namespace RGSSUnity.RubyClasses
         public int Z;
         public int Ox, Oy;
         public bool Visible = true;
+        public bool IsDefault;
         public ToneData? Tone;
+        public ColorData? Color;
         public ColorData? FlashColor;
         public int FlashDuration;
         public int FlashRemain;

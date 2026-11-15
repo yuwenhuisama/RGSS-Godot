@@ -1,0 +1,13 @@
+bitmap_dimensions	64	48	64	48
+bitmap_pixel	20.0	40.0	60.0	255.0
+text_size	Arial	Hello	46	24
+text_size	Arial	iiii	20	24
+text_size	Arial	WWWW	84	24
+text_size	Arial	12345	60	24
+text_size	Arial		0	0
+text_size	VL Gothic	Hello	60	24
+text_size	VL Gothic	iiii	48	24
+text_size	VL Gothic	WWWW	48	24
+text_size	VL Gothic	12345	60	24
+text_size	VL Gothic		0	0
+table_roundtrip	-321

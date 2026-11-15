@@ -1,0 +1,7 @@
+Platform: linux
+Configure: --disable-everything --disable-autodetect --disable-network --disable-doc --disable-ffplay --disable-ffprobe --disable-avdevice --disable-swscale --disable-debug --disable-iconv --disable-x86asm --enable-ffmpeg --enable-decoder=wmav1\,wmav2\,wmapro\,wmalossless\,wmavoice --enable-demuxer=asf\,wav --enable-muxer=wav --enable-encoder=pcm_s16le --enable-protocol=file --enable-filter=aresample\,aformat\,anull\,atrim --enable-decoder=pcm_s16le
+cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+

@@ -1,0 +1,20 @@
+integer	0	0	true
+integer	1	1	true
+integer	-1	-1	true
+integer	2147483647	2147483647	true
+integer	2147483648	2147483648	true
+integer	-2147483649	-2147483649	true
+integer	1099511627776	1099511627776	true
+integer	9223372036854775807	9223372036854775807	true
+integer	-9223372036854775808	-9223372036854775808	true
+float	0.0	0.0
+float	-0.0	-0.0
+float	1.25	1.25
+float	Infinity	Infinity
+float	-Infinity	-Infinity
+hash-default	2	7	7
+marshal-load	42	true
+bignum-links	true
+bigint	true	true
+struct-cycle	42	true
+hash-cycle-default	true	true

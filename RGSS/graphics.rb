@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 module Graphics
@@ -71,6 +71,11 @@ module Graphics
   def self.play_movie(filename)
     check_arguments([filename], [String])
     Unity::Graphics.play_movie(filename)
+    begin
+      update while Unity::Graphics.movie_playing?
+    ensure
+      Unity::Graphics.stop_movie
+    end
   end
 
   def self.transition(duration = 10, filename = nil, vague = 40)
@@ -122,6 +127,7 @@ module Graphics
   # one frame per iteration with no per-callsite patching.
   def self.update
     Unity::Graphics.update
+    raise RGSSReset if Unity.rgss_reset_requested?
     Fiber.yield
     nil
   end

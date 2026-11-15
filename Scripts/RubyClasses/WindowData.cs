@@ -37,6 +37,8 @@ public class WindowData : RubyData
     // Per-frame animation clock, advanced by Window#update (once per game frame).
     // Drives cursor blink and pause-sign animation, mirroring RGSS3 Window#update.
     public int AnimationTick;
+    public int CursorTick;
+    public int PauseFadeTick;
 
     public Node2D? Node;
 

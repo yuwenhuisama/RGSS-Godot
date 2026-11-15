@@ -1,0 +1,17 @@
+drain-cap	5	0	3	7	0
+drain-cap	6	7	0	0	3
+attack-elements-max	1.5
+explicit-element	0.5
+action-times	3	3
+variance-edge	low	80	-80	100
+variance-edge	high	120	-120	100
+confusion	1	true	1	true	3
+confusion	2	true	2	true	3
+confusion	3	true	3	true	3
+confusion	4	false	0	false	0
+confusion-target	1	0	opponent
+confusion-target	1	1	opponent
+confusion-target	2	0	opponent
+confusion-target	2	1	friend
+confusion-target	3	0	friend
+confusion-target	3	1	friend

@@ -22,6 +22,7 @@ public static class Graphics
     {
         Freezing = false;
         Render();
+        GameRenderManager.Instance.SyncRenderState();
         return state.RbNil;
     }
 
@@ -61,7 +62,8 @@ public static class Graphics
     [RbModuleMethod("frame_reset")]
     private static RbValue FrameReset(RbState state, RbValue self)
     {
-        frameCount = 0;
+        // Godot owns frame scheduling; resetting RGSS pacing does not change
+        // the script-visible frame_count, as confirmed by the original engine.
         return state.RbNil;
     }
 
@@ -110,12 +112,10 @@ public static class Graphics
         Freezing = false;
         int frames = Math.Max(0, (int)duration.ToIntUnchecked());
 
-        // No mask (nil filename): keep the Phase 1 brightness-ramp transition. After a
-        // preceding fadeout the screen is black and this fades the new scene in; with no
-        // fadeout (brightness already 1) it is an instant no-op.
+        // Without a mask, crossfade uniformly from the frozen to the live scene.
         if (maskBitmap.IsNil)
         {
-            GameRenderManager.Instance.StartBrightnessFade(1.0f, frames);
+            GameRenderManager.Instance.StartTransition(null, 0, frames);
             return state.RbNil;
         }
 
@@ -138,7 +138,7 @@ public static class Graphics
     // the cached Bitmap (it may be reused). Duplicate, convert to Rgba8, then upload.
     private static ImageTexture CreateOwnedTextureCopy(Image source)
     {
-        var copy = Image.CreateEmpty(source.GetWidth(), source.GetHeight(), false, source.GetFormat());
+        using var copy = Image.CreateEmpty(source.GetWidth(), source.GetHeight(), false, source.GetFormat());
         copy.BlitRect(source, new Rect2I(0, 0, source.GetWidth(), source.GetHeight()), Vector2I.Zero);
         if (copy.GetFormat() != Image.Format.Rgba8)
             copy.Convert(Image.Format.Rgba8);
@@ -148,7 +148,10 @@ public static class Graphics
     [RbModuleMethod("resize_screen")]
     private static RbValue ResizeScreen(RbState state, RbValue self, RbValue width, RbValue height)
     {
-        DisplayServer.WindowSetSize(new Vector2I((int)width.ToIntUnchecked(), (int)height.ToIntUnchecked()));
+        var size = new Vector2I(Math.Clamp((int)width.ToIntUnchecked(), 1, 640), Math.Clamp((int)height.ToIntUnchecked(), 1, 480));
+        var root = ((SceneTree)Engine.GetMainLoop()).Root;
+        root.ContentScaleSize = size;
+        root.Size = size;
         return state.RbNil;
     }
 
@@ -163,22 +166,59 @@ public static class Graphics
     [RbModuleMethod("snap_to_bitmap")]
     private static RbValue SnapToBitmap(RbState state, RbValue self)
     {
+        // The map is disposed when entering a menu; its background must own a
+        // copy of the last rendered frame, rather than an empty bitmap.
+        if (DisplayServer.GetName() != "headless" && Engine.GetMainLoop() is SceneTree tree)
+        {
+            var image = tree.Root.GetTexture().GetImage();
+            if (image is not null && !image.IsEmpty())
+            {
+                if (image.GetFormat() != Image.Format.Rgba8)
+                    image.Convert(Image.Format.Rgba8);
+                var logicalSize = GetRenderSize();
+                // RenderingDevice allocates a minimum 2x2 target, while RGSS
+                // permits a 1x1 logical screen. Return only the logical area.
+                if (image.GetWidth() != (int)logicalSize.X || image.GetHeight() != (int)logicalSize.Y)
+                {
+                    var cropped = image.GetRegion(new Rect2I(0, 0, (int)logicalSize.X, (int)logicalSize.Y));
+                    image.Dispose();
+                    image = cropped;
+                }
+                if (GameRenderManager.Instance.GetGraphicsBrightness() == 0.0f)
+                    image.Fill(new Godot.Color(0, 0, 0, 0));
+                return Bitmap.CreateBitmapObject(state, image);
+            }
+            image?.Dispose();
+        }
+
         var size = GetRenderSize();
         return Bitmap.NewWithWidthAndHeight(state, self, ((long)Math.Max(1, (int)size.X)).ToValue(state), ((long)Math.Max(1, (int)size.Y)).ToValue(state));
     }
 
     [RbModuleMethod("play_movie")]
     private static RbValue PlayMovie(RbState state, RbValue self, RbValue filename)
-        => state.RbNil;
-
-    private static Vector2 GetRenderSize()
     {
-        if (GlobalConfig.Instance.LegacyMode)
-            return new Vector2(GlobalConfig.Instance.LegacyModeWidth, GlobalConfig.Instance.LegacyModeHeight);
+        GameMoviePlayer.Start(filename.ToStringUnchecked()!);
+        return state.RbNil;
+    }
 
+    [RbModuleMethod("movie_playing?")]
+    private static RbValue MoviePlaying(RbState state, RbValue self)
+        => (GameMoviePlayer.Current is not null).ToValue(state);
+
+    [RbModuleMethod("stop_movie")]
+    private static RbValue StopMovie(RbState state, RbValue self)
+    {
+        GameMoviePlayer.Stop();
+        return state.RbNil;
+    }
+
+    public static Vector2 GetRenderSize()
+    {
         var root = Engine.GetMainLoop() is SceneTree tree ? tree.Root : null;
         if (root is not null)
-            return root.GetVisibleRect().Size;
+            return root.ContentScaleSize.X > 0 && root.ContentScaleSize.Y > 0
+                ? root.ContentScaleSize : root.GetVisibleRect().Size;
 
         return new Vector2(544, 416);
     }

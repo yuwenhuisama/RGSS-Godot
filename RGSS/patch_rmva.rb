@@ -5,7 +5,12 @@ module SceneManager
     Audio.setup_midi if use_midi?
     @scene = first_scene_class.new
 
-    @scene.main while @scene
+    begin
+      @scene.main while @scene
+    rescue RGSSReset => reset
+      @scene.terminate if @scene
+      raise reset
+    end
   end
 end
 
@@ -22,10 +27,12 @@ end
 
 module DataManager
   def self.__get_real_path__(*path)
+    return File.join(*path) if path[0] && (path[0].start_with?('/', '\\') || path[0][1,2] == ':/' || path[0][1,2] == ':\\')
     File.join($rmva_project_base_path, "RMProject", *path)
   end
 
   def self.__get_rtp_path__(*path)
+    return File.join(*path) if path[0] && (path[0].start_with?('/', '\\') || path[0][1,2] == ':/' || path[0][1,2] == ':\\')
     File.join($rtp_path, *path)
   end
 

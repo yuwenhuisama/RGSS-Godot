@@ -1,0 +1,12 @@
+0		false	false
+1	E0	true	false
+2	E0	false	false
+3	E0	false	false
+4	E0,E0	false	false
+5	E0,E0,E0	false	false
+6	E0,E0,E0,E0	false	false
+7	A1	true	false
+8	A1,A3	false	false
+9	A2	true	true
+10	A2	false	true
+11	A1	false	false

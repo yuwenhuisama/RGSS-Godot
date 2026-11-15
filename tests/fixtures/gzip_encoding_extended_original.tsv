@@ -1,0 +1,14 @@
+utf16le	accepted	e381
+latin1	ArgumentError
+eucjp	ArgumentError
+shiftjis	ArgumentError
+utf8-internal-utf8	accepted	e38182
+utf8-internal-ascii	accepted	e3
+internal-only	accepted	e3
+unknown-internal	ArgumentError
+nil-external	accepted	e38182
+empty-external	ArgumentError
+utf16le-pair	accepted	3dd800de,4100
+utf16le-short	accepted	41
+utf16le-high	accepted	3dd8,4100
+utf16le-low	accepted	00de,4100

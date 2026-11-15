@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 require 'type_check_util'
 
 class Table
@@ -6,17 +6,28 @@ class Table
 
   attr_reader :__handler__
 
-  def initialize(xsize, ysize=0, zsize=0)
+  def initialize(xsize, *dimensions)
+    raise ArgumentError, 'Invalid number of arguments' if dimensions.size > 2
+    @dimension = 1 + dimensions.size
+    ysize, zsize = dimensions
+    ysize = 1 if dimensions.size < 1
+    zsize = 1 if dimensions.size < 2
     check_arguments([xsize, ysize, zsize], [Integer, Integer, Integer])
     @__handler__ = Unity::Table.new_xyz(xsize, ysize, zsize)
   end
 
-  def resize(xsize, ysize=0, zsize=0)
+  def resize(xsize, *dimensions)
+    raise ArgumentError, 'Invalid number of arguments' if dimensions.size > 2
+    @dimension = 1 + dimensions.size
+    ysize, zsize = dimensions
+    ysize = 1 if dimensions.size < 1
+    zsize = 1 if dimensions.size < 2
     check_arguments([xsize, ysize, zsize], [Integer, Integer, Integer])
     @__handler__.resize(xsize, ysize, zsize)
   end
 
   def [](*args)
+    raise ArgumentError, "wrong number of arguments (#{@dimension} for #{args.size})" unless args.size == @dimension
     if args.size == 1
       check_arguments(args, [Integer])
       x, = args
@@ -35,6 +46,7 @@ class Table
   end
 
   def []=(*args)
+    raise ArgumentError, "wrong number of arguments (#{@dimension} for #{args.size - 1})" unless args.size == @dimension + 1
     if args.size == 2
       check_arguments(args, [Integer, Integer])
       x, val = args
@@ -65,13 +77,13 @@ class Table
 
   # refer from https://forum.chaos-project.com/index.php?topic=9103.0
   def _dump(d = 0)
-    s = [3].pack('L')
+    s = [@dimension].pack('L')
     s += [self.xsize].pack('L') + [self.ysize].pack('L') + [self.zsize].pack('L')
     s += [self.xsize * self.ysize * self.zsize].pack('L')
     for z in 0...self.zsize
       for y in 0...self.ysize
         for x in 0...self.xsize
-          s += [self[x, y, z]].pack('S')
+          s += [@__handler__.get_xyz(x, y, z)].pack('S')
         end
       end
     end
@@ -90,12 +102,12 @@ class Table
       pointer += 2
       break if pointer > s.size - 1
     end
-    t = Table.new(nx, ny, nz)
+    t = Table.new(*[nx, ny, nz][0, size])
     n = 0
     for z in 0...nz
       for y in 0...ny
         for x in 0...nx
-          t[x, y, z] = data[n]
+          t.__handler__.set_xyz(x, y, z, data[n])
           n += 1
         end
       end

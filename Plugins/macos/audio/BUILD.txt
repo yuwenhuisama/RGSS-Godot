@@ -1,0 +1,6 @@
+Platform: macos
+Configure: --disable-everything --disable-autodetect --disable-network --disable-doc --disable-ffplay --disable-ffprobe --disable-avdevice --disable-swscale --disable-debug --disable-iconv --disable-x86asm --enable-ffmpeg --enable-decoder=wmav1\,wmav2\,wmapro\,wmalossless\,wmavoice --enable-demuxer=asf\,wav --enable-muxer=wav --enable-encoder=pcm_s16le --enable-protocol=file --enable-filter=aresample\,aformat\,anull\,atrim --enable-decoder=pcm_s16le
+Apple clang version 17.0.0 (clang-1700.6.3.2)
+Target: arm64-apple-darwin27.0.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin

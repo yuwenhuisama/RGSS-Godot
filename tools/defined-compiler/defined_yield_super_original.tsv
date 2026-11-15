@@ -1,0 +1,77 @@
+yield-toplevel	nil
+yield-toplevel-eval	nil
+yield-method-no-block	nil,nil,nil
+yield-method-with-block	yield,yield,yield
+yield-escaped-closure-no-block	nil
+yield-escaped-closure-with-block	yield
+yield-eval-no-block	nil
+yield-eval-with-block	yield
+yield-define-method-no-block	nil
+yield-define-method-with-block	nil
+yield-define-method-eval-with-block	nil
+yield-dm-in-def-outer-absent	nil
+yield-dm-in-def-outer-present	yield
+super-toplevel	nil
+super-toplevel-eval	nil
+super-class-body	nil
+super-module-body	nil
+super-method-present	super,super,super
+super-method-missing	nil,nil,nil
+super-private-parent	super
+super-protected-parent	super
+super-module-backed-zsuper	super
+super-module-backed-args	super
+super-module-only-zsuper	nil
+super-module-only-args	nil
+super-singleton-present	super
+super-singleton-missing	nil
+super-alias-lexical-missing	nil
+super-alias-lexical-present	super
+super-define-method-present	super
+super-define-method-missing	nil
+super-eval-present	super
+super-eval-missing	nil
+super-escaped-closure-present	super
+super-escaped-closure-missing	nil
+ary-empty	expression
+ary-literals	expression
+ary-consts-present	expression
+ary-const-missing-last	nil
+ary-const-missing-first-uneval	nil
+ary-nested-present	expression
+ary-nested-missing	nil
+ary-calls-present-uneval	expression
+ary-calls-missing-uneval	nil
+ary-asgn-and-ivar-uneval	expression
+ary-ivar-unset-missing	nil
+ary-splat-elements	expression,expression
+ary-word-literals-uneval	expression,expression
+ary-short-circuit-order	nil,0,nil,1,"expression",2
+super-iexec-class-unrelated-present	super
+super-iexec-class-unrelated-missing	nil
+super-iexec-class-integer-present	super
+super-ieval-class-unrelated-present	super
+super-cexec-class-unrelated-present	super
+super-iexec-dm-unrelated-present	nil
+super-iexec-dm-unrelated-missing	nil
+super-iexec-sdef-unrelated-present	super
+super-iexec-sdef-unrelated-missing	nil
+super-iexec-mod-self-and-sub	super,super
+super-iexec-mod-other-includer-with-base	super
+super-iexec-mod-includer-without-base	nil
+super-iexec-mod-sibling-without-mod	nil
+super-iexec-mod-unrelated	nil,nil
+match-init-before-any-regex	["global-variable", nil, nil, nil, nil, nil, nil, nil, nil]
+match-opt-tilde-and-regions	["global-variable", true, "global-variable", "a", "global-variable", "x", "global-variable", "y"]
+match-opt-plus-and-groups	["global-variable", "a", "global-variable", "a", nil, nil, nil, nil, nil, nil]
+match-ten-groups	["global-variable", "i", "global-variable", "j", nil, nil, "global-variable", "j"]
+match-mismatch-clears	["global-variable", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil]
+match-str-eqtilde	["global-variable", "hello-42", "global-variable", "hello", "global-variable", "42", nil, nil, "global-variable", "42"]
+match-str-sub	["global-variable", "bar2", "global-variable", "bar", "global-variable", "2", nil]
+match-str-slice-bang	["789", "pre--post", "global-variable", "789", nil]
+match-str-index	[6, "global-variable", "55"]
+match-method-block-eval-isolation	[["global-variable", "out1"], ["global-variable", "in1", "global-variable", "in2"], ["global-variable", "out1", "global-variable", "out2"], ["global-variable", "ev1"], ["global-variable", "ev1", "global-variable", "ev2"]]
+match-define-method-isolation	[["global-variable", "dm1"], "global-variable", "cm1", "global-variable", "cm2"]
+match-escaped-shared-closures	[["global-variable", "sh1", "global-variable", "sh2"], ["global-variable", "up1", "global-variable", "up2"], ["global-variable", "topA", "global-variable", "topB"]]
+match-explicit-tilde-assign	[["global-variable", "a", "global-variable", "a", nil, nil, "global-variable", "a"], ["global-variable", nil, nil, nil, nil, nil], :type_error]
+defined-ys-side-effect-count	0

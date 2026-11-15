@@ -28,6 +28,25 @@ func _initialize() -> void:
 	_root.name = "RgssApiTestRoot"
 	root.add_child(_root)
 	_driver.Initialize(_root)
+	if not _driver.RunRuby("""
+require 'kernel'
+require 'color'
+require 'tone'
+require 'rect'
+require 'font'
+require 'graphics'
+require 'bitmap'
+require 'viewport'
+require 'sprite'
+require 'plane'
+require 'window'
+require 'table'
+require 'tilemap'
+"""):
+		push_error("RGSS API wrappers failed to initialize")
+		_driver.Shutdown()
+		quit(1)
+		return
 	for i in range(3):
 		_driver.UpdateRenderManager()
 		await process_frame
@@ -126,10 +145,10 @@ _aeq(c.red, 11, 0.6, 'r'); _aeq(c.green, 22, 0.6, 'g')
 _aeq(c.blue, 33, 0.6, 'b'); _aeq(c.alpha, 44, 0.6, 'a')
 true
 """],
-		["Color setters clamp to 0..255", _ASSERT + """
+		["Color setters preserve original RGB negatives and clamp upper bound", _ASSERT + """
 c = Color.new(0,0,0,0)
 c.red = 999; c.green = -50
-_aeq(c.red, 255, 0.6, 'clamp hi'); _aeq(c.green, 0, 0.6, 'clamp lo')
+_aeq(c.red, 255, 0.6, 'clamp hi'); _aeq(c.green, -50, 0.6, 'original negative RGB')
 true
 """],
 		["Color::BLACK is black not white (B3 regression)", _ASSERT + """
@@ -227,7 +246,7 @@ func _table_tests() -> Array:
 	return [
 		["Table 1D get/set + xsize", _ASSERT + """
 t = Table.new(4)
-_eq(t.xsize, 4, 'xsize'); _eq(t.ysize, 0, 'ysize'); _eq(t[0], 0, 'init 0')
+_eq(t.xsize, 4, 'xsize'); _eq(t.ysize, 1, 'ysize'); _eq(t.zsize, 1, 'zsize'); _eq(t[0], 0, 'init 0')
 t[2] = 7; _eq(t[2], 7, 'set/get')
 true
 """],
@@ -297,7 +316,7 @@ true
 		["Font#name= reflected by getter (B11)", _ASSERT + """
 f = Font.new('Arial', 24)
 f.name = 'Times'
-_eq(f.name, ['Times'], 'name array')
+_eq(f.name, 'Times', 'name string')
 true
 """],
 		["Font.exist? returns boolean (G1)", _ASSERT + """
@@ -625,9 +644,10 @@ true
 # ============================ WINDOW ============================
 func _window_tests() -> Array:
 	return [
-		["Window default padding is 12 (G3)", _ASSERT + """
+		["Window default padding matches installed RGSS300", _ASSERT + """
 w = Window.new(0, 0, 100, 80)
-_eq(w.padding, 12, 'padding')
+_eq(w.padding, 8, 'padding')
+_eq(w.padding_bottom, 8, 'padding_bottom')
 w.dispose
 true
 """],
@@ -738,7 +758,7 @@ true
 """],
 		["Graphics.frame_count= and frame_reset", _ASSERT + """
 Graphics.frame_count = 123; _eq(Graphics.frame_count, 123, 'fc set')
-Graphics.frame_reset; _eq(Graphics.frame_count, 0, 'fc reset')
+Graphics.frame_reset; _eq(Graphics.frame_count, 123, 'fc reset preserves count')
 true
 """],
 		["Graphics.brightness= round-trips 0..255", _ASSERT + """

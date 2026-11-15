@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using Godot;
 using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 using MRuby.Library.Language;
@@ -18,9 +19,60 @@ public static class UnityModule
 
     private static readonly List<(long ScriptId, string ScriptName, string ScriptContent)> RmvaScripts = new();
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct FindData
+    {
+        public uint Attributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime, AccessTime, WriteTime;
+        public uint SizeHigh, SizeLow, ReparseTag, Reserved;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string Filename;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)] public string AlternateFilename;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr FindFirstFileW(string filename, out FindData data);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FindClose(IntPtr handle);
+
+    [RbClassMethod("file_symlink?")]
+    private static RbValue FileSymlink(RbState state, RbValue self, RbValue path)
+    {
+        var filename = path.ToStringUnchecked();
+        if (OperatingSystem.IsWindows())
+        {
+            var handle = FindFirstFileW(filename, out var data);
+            if (handle == new IntPtr(-1))
+                return state.RbFalse;
+            try
+            {
+                return (data.ReparseTag == 0xA000000C).ToValue(state);
+            }
+            finally
+            {
+                FindClose(handle);
+            }
+        }
+        try
+        {
+            return ((File.GetAttributes(filename) & FileAttributes.ReparsePoint) != 0).ToValue(state);
+        }
+        catch (FileNotFoundException)
+        {
+            return state.RbFalse;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return state.RbFalse;
+        }
+    }
+
     [RbInitEntryPoint]
     public static void Init(RbClass cls)
     {
+        RmvaScripts.Clear();
+        resetRequested = false;
         State = RubyScriptManager.Instance.State;
     }
 
@@ -36,6 +88,15 @@ public static class UnityModule
                 RGSSLogger.LogError("Failed to resume update fiber");
                 RGSSLogger.LogError(SafeClassName(res));
             }
+        }
+    }
+
+    public static void ReleaseUpdateFiber(RbState state)
+    {
+        if (UpdateFiber is not null)
+        {
+            state.GcUnregister(UpdateFiber);
+            UpdateFiber = null;
         }
     }
 
@@ -56,11 +117,7 @@ public static class UnityModule
     [RbClassMethod("unregister_update_fiber")]
     private static RbValue UnregisterUpdateFiber(RbState state, RbValue self)
     {
-        if (UpdateFiber is not null)
-        {
-            state.GcUnregister(UpdateFiber);
-            UpdateFiber = null;
-        }
+        ReleaseUpdateFiber(state);
 
         return state.RbNil;
     }
@@ -94,11 +151,36 @@ public static class UnityModule
     private static RbValue GetRtpPath(RbState state, RbValue self)
         => string.IsNullOrEmpty(GlobalConfig.Instance.RtpPath) ? state.RbNil : GlobalConfig.Instance.RtpPath.ToValue(state);
 
+    [RbClassMethod("cn_ver_rmva")]
+    private static RbValue GetChineseRmvaVersion(RbState state, RbValue self)
+        => GlobalConfig.Instance.CnVerRmva.ToValue(state);
+
+    private static bool resetRequested;
+
+    public static void RequestReset() => resetRequested = true;
+
+    [RbClassMethod("rgss_reset_requested?")]
+    private static RbValue ConsumeResetRequest(RbState state, RbValue self)
+    {
+        var requested = resetRequested;
+        resetRequested = false;
+        return requested.ToValue(state);
+    }
+
+    [RbClassMethod("reset_rgss_resources")]
+    private static RbValue ResetRgssResources(RbState state, RbValue self)
+    {
+        // SceneManager restarts the stock scene loop; its terminate path owns
+        // disposal. Keep the default viewport alive across callback retries.
+        InputStateRecorder.Instance.Init();
+        return state.RbNil;
+    }
+
     [RbClassMethod("exit_game")]
     private static RbValue ExitGame(RbState state, RbValue self)
     {
         if (Engine.GetMainLoop() is SceneTree tree)
-            tree.Quit();
+            Callable.From(() => GameManager.QuitGame(tree)).CallDeferred();
         return state.RbNil;
     }
 
