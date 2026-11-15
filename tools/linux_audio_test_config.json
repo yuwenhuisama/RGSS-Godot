@@ -1,0 +1,8 @@
+{
+  "project_path": "/tmp/linux-audio-project",
+  "rtp_path": "/rtp",
+  "legacy_mode": true,
+  "legacy_mode_width": 544,
+  "legacy_mode_height": 416,
+  "cn_ver_rmva": true
+}

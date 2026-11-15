@@ -51,3 +51,24 @@ mruby-ext/**/*.cs.uid
 # from the copyrighted Scripts.rvdata2). Game content is not tracked here, same as
 # RMProject/ and *.rvdata2 — regenerate locally instead of committing.
 docs/rmva-scripts/
+
+# Local agent runs, captures and dependency installations (preserve on disk).
+.omo/
+.omo-tmp-img/
+.playwright-mcp/
+.sprite-inspection-*/
+.sisyphus/evidence/
+.sisyphus/notepads/
+.sisyphus/boulder.json
+node_modules/
+.xmake/
+evidence/
+reference_img/
+*.tmp.*
+
+# Imported documentation images and local UI captures are not runtime assets.
+docs/rgss-reference/**/*.import
+/asset-canvas-*.png*
+/medot-owned-frame-ui-only.png*
+/sprite-methods-report-full.png*
+/cursor_cache_reference.tsv

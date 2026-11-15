@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>org.rgssgodot.audio-probe</string>
+<key>CFBundleName</key><string>RGSS Audio Probe</string>
+<key>CFBundleExecutable</key><string>capture</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>NSAudioCaptureUsageDescription</key><string>Capture only the RGSS test process to verify WMA and MIDI playback and post-stop silence.</string>
+</dict></plist>

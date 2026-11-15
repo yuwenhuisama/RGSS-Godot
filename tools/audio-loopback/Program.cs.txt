@@ -1,0 +1,51 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using NAudio.Wave;
+using NAudio.CoreAudioApi;
+
+if (args.Length == 1 && args[0] == "--devices")
+{
+    using var devices = new MMDeviceEnumerator();
+    foreach (var device in devices.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+    {
+        using (device)
+        {
+            Console.WriteLine($"OUTPUT_DEVICE:{device.ID}:{device.FriendlyName}");
+            var sessions = device.AudioSessionManager.Sessions;
+            for (var index = 0; index < sessions.Count; index++)
+            {
+                using var session = sessions[index];
+                Console.WriteLine($"OUTPUT_SESSION:{session.GetProcessID}:{session.State}:mute={session.SimpleAudioVolume.Mute}:volume={session.SimpleAudioVolume.Volume}");
+            }
+        }
+    }
+    return;
+}
+
+if (args.Length is not (2 or 3)) throw new ArgumentException("Usage: AudioLoopback OUTPUT.wav SECONDS [DEVICE_ID]");
+var seconds = double.Parse(args[1], System.Globalization.CultureInfo.InvariantCulture);
+Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
+using var enumerator = new MMDeviceEnumerator();
+using var endpoint = args.Length == 3 ? enumerator.GetDevice(args[2]) : enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+using var capture = new WasapiLoopbackCapture(endpoint);
+using var writer = new WaveFileWriter(args[0], capture.WaveFormat);
+using var chunks = new StreamWriter(args[0] + ".chunks.tsv");
+chunks.WriteLine("callback_unix_seconds\tpcm_byte_offset\tbyte_count");
+var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+capture.DataAvailable += (_, data) =>
+{
+    chunks.WriteLine(FormattableString.Invariant($"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0:F3}\t{writer.Length}\t{data.BytesRecorded}"));
+    writer.Write(data.Buffer, 0, data.BytesRecorded);
+};
+capture.RecordingStopped += (_, data) =>
+{
+    if (data.Exception is not null) stopped.TrySetException(data.Exception);
+    else stopped.TrySetResult();
+};
+capture.StartRecording();
+Console.WriteLine($"LOOPBACK_READY:{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0:F3}:{endpoint.FriendlyName}:{capture.WaveFormat}");
+await Task.Delay(TimeSpan.FromSeconds(seconds));
+capture.StopRecording();
+await stopped.Task;
+Console.WriteLine($"LOOPBACK_CAPTURED:{writer.Length}");
